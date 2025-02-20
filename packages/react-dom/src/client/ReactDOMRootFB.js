@@ -27,7 +27,10 @@ import {
   hydrateRoot as hydrateRootImpl,
 } from './ReactDOMRoot';
 
-import {disableLegacyMode} from 'shared/ReactFeatureFlags';
+import {
+  disableLegacyMode,
+  disableCommentsAsDOMContainers,
+} from 'shared/ReactFeatureFlags';
 import {clearContainer} from 'react-dom-bindings/src/client/ReactFiberConfigDOM';
 import {
   getInstanceFromNode,
@@ -36,7 +39,7 @@ import {
   unmarkContainerAsRoot,
 } from 'react-dom-bindings/src/client/ReactDOMComponentTree';
 import {listenToAllSupportedEvents} from 'react-dom-bindings/src/events/DOMPluginEventSystem';
-import {isValidContainerLegacy} from 'react-dom-bindings/src/client/ReactDOMContainer';
+import {isValidContainer} from 'react-dom-bindings/src/client/ReactDOMContainer';
 import {
   DOCUMENT_NODE,
   ELEMENT_NODE,
@@ -59,9 +62,11 @@ import {
 } from 'react-reconciler/src/ReactFiberReconciler';
 import {LegacyRoot} from 'react-reconciler/src/ReactRootTags';
 import getComponentNameFromType from 'shared/getComponentNameFromType';
-import {has as hasInstance} from 'shared/ReactInstanceMap';
 
-import {currentOwner} from 'react-reconciler/src/ReactFiberCurrentOwner';
+import {
+  current as currentOwner,
+  isRendering,
+} from 'react-reconciler/src/ReactCurrentFiber';
 
 import assign from 'shared/assign';
 
@@ -242,7 +247,9 @@ function legacyCreateRootFromDOMContainer(
     markContainerAsRoot(root.current, container);
 
     const rootContainerElement =
-      container.nodeType === COMMENT_NODE ? container.parentNode : container;
+      !disableCommentsAsDOMContainers && container.nodeType === COMMENT_NODE
+        ? container.parentNode
+        : container;
     // $FlowFixMe[incompatible-call]
     listenToAllSupportedEvents(rootContainerElement);
 
@@ -276,7 +283,9 @@ function legacyCreateRootFromDOMContainer(
     markContainerAsRoot(root.current, container);
 
     const rootContainerElement =
-      container.nodeType === COMMENT_NODE ? container.parentNode : container;
+      !disableCommentsAsDOMContainers && container.nodeType === COMMENT_NODE
+        ? container.parentNode
+        : container;
     // $FlowFixMe[incompatible-call]
     listenToAllSupportedEvents(rootContainerElement);
 
@@ -343,7 +352,7 @@ export function findDOMNode(
 ): null | Element | Text {
   if (__DEV__) {
     const owner = currentOwner;
-    if (owner !== null && owner.stateNode !== null) {
+    if (owner !== null && isRendering && owner.stateNode !== null) {
       const warnedAboutRefsInRender = owner.stateNode._warnedAboutRefsInRender;
       if (!warnedAboutRefsInRender) {
         console.error(
@@ -392,7 +401,7 @@ export function render(
     );
   }
 
-  if (!isValidContainerLegacy(container)) {
+  if (!isValidContainer(container)) {
     throw new Error('Target container is not a DOM element.');
   }
 
@@ -417,46 +426,6 @@ export function render(
   );
 }
 
-export function unstable_renderSubtreeIntoContainer(
-  parentComponent: React$Component<any, any>,
-  element: React$Element<any>,
-  containerNode: Container,
-  callback: ?Function,
-): React$Component<any, any> | PublicInstance | null {
-  if (disableLegacyMode) {
-    if (__DEV__) {
-      console.error(
-        'ReactDOM.unstable_renderSubtreeIntoContainer() was removed in React 19. Consider using a portal instead.',
-      );
-    }
-    throw new Error('ReactDOM: Unsupported Legacy Mode API.');
-  }
-  if (__DEV__) {
-    console.error(
-      'ReactDOM.unstable_renderSubtreeIntoContainer() has not been supported ' +
-        'since React 18. Consider using a portal instead. Until you switch to ' +
-        "the createRoot API, your app will behave as if it's running React " +
-        '17. Learn more: https://react.dev/link/switch-to-createroot',
-    );
-  }
-
-  if (!isValidContainerLegacy(containerNode)) {
-    throw new Error('Target container is not a DOM element.');
-  }
-
-  if (parentComponent == null || !hasInstance(parentComponent)) {
-    throw new Error('parentComponent must be a valid React Component');
-  }
-
-  return legacyRenderSubtreeIntoContainer(
-    parentComponent,
-    element,
-    containerNode,
-    false,
-    callback,
-  );
-}
-
 export function unmountComponentAtNode(container: Container): boolean {
   if (disableLegacyMode) {
     if (__DEV__) {
@@ -466,7 +435,7 @@ export function unmountComponentAtNode(container: Container): boolean {
     }
     throw new Error('ReactDOM: Unsupported Legacy Mode API.');
   }
-  if (!isValidContainerLegacy(container)) {
+  if (!isValidContainer(container)) {
     throw new Error('Target container is not a DOM element.');
   }
 
@@ -510,7 +479,7 @@ export function unmountComponentAtNode(container: Container): boolean {
       // Check if the container itself is a React root node.
       const isContainerReactRoot =
         container.nodeType === ELEMENT_NODE &&
-        isValidContainerLegacy(container.parentNode) &&
+        isValidContainer(container.parentNode) &&
         // $FlowFixMe[prop-missing]
         // $FlowFixMe[incompatible-use]
         !!container.parentNode._reactRootContainer;

@@ -37,10 +37,8 @@ import {
   ForceClientRender,
   ScheduleRetry,
 } from './ReactFiberFlags';
-import {NoMode, ConcurrentMode, DebugTracingMode} from './ReactTypeOfMode';
+import {NoMode, ConcurrentMode} from './ReactTypeOfMode';
 import {
-  enableDebugTracing,
-  enableLazyContextPropagation,
   enableUpdaterTracking,
   enablePostpone,
   disableLegacyMode,
@@ -70,7 +68,6 @@ import {
 } from './ReactFiberWorkLoop';
 import {propagateParentContextChangesToDeferredTree} from './ReactFiberNewContext';
 import {logUncaughtError, logCaughtError} from './ReactFiberErrorLogger';
-import {logComponentSuspended} from './DebugTracing';
 import {isDevToolsPresent} from './ReactFiberDevToolsHook';
 import {
   SyncLane,
@@ -87,6 +84,8 @@ import {
 import {ConcurrentRoot} from './ReactRootTags';
 import {noopSuspenseyCommitThenable} from './ReactFiberThenable';
 import {REACT_POSTPONE_TYPE} from 'shared/ReactSymbols';
+import {runWithFiberInDEV} from './ReactCurrentFiber';
+import {callComponentDidCatchInDEV} from './ReactFiberCallUserSpace';
 
 function createRootErrorUpdate(
   root: FiberRoot,
@@ -100,7 +99,11 @@ function createRootErrorUpdate(
   // being called "element".
   update.payload = {element: null};
   update.callback = () => {
-    logUncaughtError(root, errorInfo);
+    if (__DEV__) {
+      runWithFiberInDEV(errorInfo.source, logUncaughtError, root, errorInfo);
+    } else {
+      logUncaughtError(root, errorInfo);
+    }
   };
   return update;
 }
@@ -127,7 +130,17 @@ function initializeClassErrorUpdate(
       if (__DEV__) {
         markFailedErrorBoundaryForHotReloading(fiber);
       }
-      logCaughtError(root, fiber, errorInfo);
+      if (__DEV__) {
+        runWithFiberInDEV(
+          errorInfo.source,
+          logCaughtError,
+          root,
+          fiber,
+          errorInfo,
+        );
+      } else {
+        logCaughtError(root, fiber, errorInfo);
+      }
     };
   }
 
@@ -138,7 +151,17 @@ function initializeClassErrorUpdate(
       if (__DEV__) {
         markFailedErrorBoundaryForHotReloading(fiber);
       }
-      logCaughtError(root, fiber, errorInfo);
+      if (__DEV__) {
+        runWithFiberInDEV(
+          errorInfo.source,
+          logCaughtError,
+          root,
+          fiber,
+          errorInfo,
+        );
+      } else {
+        logCaughtError(root, fiber, errorInfo);
+      }
       if (typeof getDerivedStateFromError !== 'function') {
         // To preserve the preexisting retry behavior of error boundaries,
         // we keep track of which ones already failed during this batch.
@@ -147,11 +170,15 @@ function initializeClassErrorUpdate(
         // not defined.
         markLegacyErrorBoundaryAsFailed(this);
       }
-      const error = errorInfo.value;
-      const stack = errorInfo.stack;
-      this.componentDidCatch(error, {
-        componentStack: stack !== null ? stack : '',
-      });
+      if (__DEV__) {
+        callComponentDidCatchInDEV(this, errorInfo);
+      } else {
+        const error = errorInfo.value;
+        const stack = errorInfo.stack;
+        this.componentDidCatch(error, {
+          componentStack: stack !== null ? stack : '',
+        });
+      }
       if (__DEV__) {
         if (typeof getDerivedStateFromError !== 'function') {
           // If componentDidCatch is the only error boundary method defined,
@@ -171,21 +198,19 @@ function initializeClassErrorUpdate(
 }
 
 function resetSuspendedComponent(sourceFiber: Fiber, rootRenderLanes: Lanes) {
-  if (enableLazyContextPropagation) {
-    const currentSourceFiber = sourceFiber.alternate;
-    if (currentSourceFiber !== null) {
-      // Since we never visited the children of the suspended component, we
-      // need to propagate the context change now, to ensure that we visit
-      // them during the retry.
-      //
-      // We don't have to do this for errors because we retry errors without
-      // committing in between. So this is specific to Suspense.
-      propagateParentContextChangesToDeferredTree(
-        currentSourceFiber,
-        sourceFiber,
-        rootRenderLanes,
-      );
-    }
+  const currentSourceFiber = sourceFiber.alternate;
+  if (currentSourceFiber !== null) {
+    // Since we never visited the children of the suspended component, we
+    // need to propagate the context change now, to ensure that we visit
+    // them during the retry.
+    //
+    // We don't have to do this for errors because we retry errors without
+    // committing in between. So this is specific to Suspense.
+    propagateParentContextChangesToDeferredTree(
+      currentSourceFiber,
+      sourceFiber,
+      rootRenderLanes,
+    );
   }
 
   // Reset the memoizedState to what it was before we attempted to render it.
@@ -366,15 +391,6 @@ function throwException(
           (disableLegacyMode || sourceFiber.mode & ConcurrentMode)
         ) {
           markDidThrowWhileHydratingDEV();
-        }
-      }
-
-      if (__DEV__) {
-        if (enableDebugTracing) {
-          if (sourceFiber.mode & DebugTracingMode) {
-            const name = getComponentNameFromFiber(sourceFiber) || 'Unknown';
-            logComponentSuspended(name, wakeable);
-          }
         }
       }
 

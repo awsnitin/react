@@ -7,8 +7,6 @@
  * @flow
  */
 
-/* eslint-disable */
-
 // libdefs cannot actually import. These are supposed to be the types imported
 // from 'react-native-renderer/src/ReactNativeTypes'
 type __MeasureOnSuccessCallback = any;
@@ -99,7 +97,7 @@ declare module 'react-native/Libraries/ReactPrivate/ReactNativePrivateInterface'
     setChildren: (containerTag: number, reactTags: Array<number>) => void,
     updateView: (reactTag: number, viewName: string, props: ?Object) => void,
     __takeSnapshot: (
-      view?: 'window' | Element<any> | number,
+      view?: 'window' | Element | number,
       options?: {
         width?: number,
         height?: number,
@@ -145,6 +143,7 @@ declare module 'react-native/Libraries/ReactPrivate/ReactNativePrivateInterface'
   };
   declare export opaque type PublicInstance;
   declare export opaque type PublicTextInstance;
+  declare export opaque type PublicRootInstance;
   declare export function getNodeFromPublicInstance(
     publicInstance: PublicInstance,
   ): Object;
@@ -155,7 +154,11 @@ declare module 'react-native/Libraries/ReactPrivate/ReactNativePrivateInterface'
     tag: number,
     viewConfig: __ViewConfig,
     internalInstanceHandle: mixed,
+    publicRootInstance: PublicRootInstance | null,
   ): PublicInstance;
+  declare export function createPublicRootInstance(
+    rootTag: number,
+  ): PublicRootInstance;
   declare export function createPublicTextInstance(
     internalInstanceHandle: mixed,
   ): PublicTextInstance;
@@ -167,10 +170,12 @@ declare module 'react-native/Libraries/ReactPrivate/ReactNativePrivateInterface'
 declare module 'react-native/Libraries/ReactPrivate/ReactNativePrivateInitializeCore' {
 }
 
+// eslint-disable-next-line no-unused-vars
 declare const RN$enableMicrotasksInReact: boolean;
 
 // This is needed for a short term solution.
 // See https://github.com/facebook/react/pull/15490 for more info
+// eslint-disable-next-line no-unused-vars
 declare const nativeFabricUIManager: {
   createNode: (
     reactTag: number,

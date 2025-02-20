@@ -22,6 +22,7 @@ import type {UpdateQueue} from 'react-reconciler/src/ReactFiberClassUpdateQueue'
 import type {ReactNodeList} from 'shared/ReactTypes';
 import type {RootTag} from 'react-reconciler/src/ReactRootTags';
 import type {EventPriority} from 'react-reconciler/src/ReactEventPriorities';
+import type {TransitionTypes} from 'react/src/ReactTransitionType.js';
 
 import * as Scheduler from 'scheduler/unstable_mock';
 import {REACT_FRAGMENT_TYPE, REACT_ELEMENT_TYPE} from 'shared/ReactSymbols';
@@ -35,13 +36,10 @@ import {
   ConcurrentRoot,
   LegacyRoot,
 } from 'react-reconciler/constants';
-import {
-  enableRefAsProp,
-  disableLegacyMode,
-  disableStringRefs,
-} from 'shared/ReactFeatureFlags';
+import {disableLegacyMode} from 'shared/ReactFeatureFlags';
 
 import ReactSharedInternals from 'shared/ReactSharedInternals';
+import ReactVersion from 'shared/ReactVersion';
 
 type Container = {
   rootID: string,
@@ -80,8 +78,11 @@ type TextInstance = {
 type HostContext = Object;
 type CreateRootOptions = {
   unstable_transitionCallbacks?: TransitionTracingCallbacks,
+  onUncaughtError?: (error: mixed, errorInfo: {componentStack: string}) => void,
+  onCaughtError?: (error: mixed, errorInfo: {componentStack: string}) => void,
   ...
 };
+type InstanceMeasurement = null;
 
 type SuspenseyCommitSubscription = {
   pendingCount: number,
@@ -91,6 +92,8 @@ type SuspenseyCommitSubscription = {
 export type TransitionStatus = mixed;
 
 export type FormInstance = Instance;
+
+export type ViewTransitionInstance = null | {name: string, ...};
 
 const NO_CONTEXT = {};
 const UPPERCASE_CONTEXT = {};
@@ -367,6 +370,9 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
   }
 
   const sharedHostConfig = {
+    rendererVersion: ReactVersion,
+    rendererPackageName: 'react-noop',
+
     supportsSingletons: false,
 
     getRootHostContext() {
@@ -503,15 +509,15 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
       typeof queueMicrotask === 'function'
         ? queueMicrotask
         : typeof Promise !== 'undefined'
-        ? callback =>
-            Promise.resolve(null)
-              .then(callback)
-              .catch(error => {
-                setTimeout(() => {
-                  throw error;
-                });
-              })
-        : setTimeout,
+          ? callback =>
+              Promise.resolve(null)
+                .then(callback)
+                .catch(error => {
+                  setTimeout(() => {
+                    throw error;
+                  });
+                })
+          : setTimeout,
 
     prepareForCommit(): null | Object {
       return null;
@@ -527,6 +533,16 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
         return currentUpdatePriority;
       }
       return currentEventPriority;
+    },
+
+    trackSchedulerEvent(): void {},
+
+    resolveEventType(): null | string {
+      return null;
+    },
+
+    resolveEventTimeStamp(): number {
+      return -1.1;
     },
 
     shouldAttemptEagerTransition(): boolean {
@@ -611,12 +627,11 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
         }
         return false;
       } else {
-        // If this is false, React will trigger a fallback, if needed.
         return record.status === 'fulfilled';
       }
     },
 
-    preloadResource(resource: mixed): boolean {
+    preloadResource(resource: mixed): number {
       throw new Error(
         'Resources are not implemented for React Noop yet. This method should not be called',
       );
@@ -631,11 +646,23 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
       );
     },
 
+    suspendOnActiveViewTransition(container: Container): void {
+      // Not implemented
+    },
+
     waitForCommitToBeReady,
 
     NotPendingTransition: (null: TransitionStatus),
 
     resetFormInstance(form: Instance) {},
+
+    bindToConsole(methodName, args, badgeName) {
+      return Function.prototype.bind.apply(
+        // eslint-disable-next-line react-internal/no-production-logging
+        console[methodName],
+        [console].concat(args),
+      );
+    },
   };
 
   const hostConfig = useMutation
@@ -710,6 +737,61 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
 
         unhideTextInstance(textInstance: TextInstance, text: string): void {
           textInstance.hidden = false;
+        },
+
+        applyViewTransitionName(
+          instance: Instance,
+          name: string,
+          className: ?string,
+        ): void {},
+
+        restoreViewTransitionName(instance: Instance, props: Props): void {},
+
+        cancelViewTransitionName(
+          instance: Instance,
+          name: string,
+          props: Props,
+        ): void {},
+
+        cancelRootViewTransitionName(rootContainer: Container): void {},
+
+        restoreRootViewTransitionName(rootContainer: Container): void {},
+
+        measureInstance(instance: Instance): InstanceMeasurement {
+          return null;
+        },
+
+        wasInstanceInViewport(measurement: InstanceMeasurement): boolean {
+          return true;
+        },
+
+        hasInstanceChanged(
+          oldMeasurement: InstanceMeasurement,
+          newMeasurement: InstanceMeasurement,
+        ): boolean {
+          return false;
+        },
+
+        hasInstanceAffectedParent(
+          oldMeasurement: InstanceMeasurement,
+          newMeasurement: InstanceMeasurement,
+        ): boolean {
+          return false;
+        },
+
+        startViewTransition(
+          rootContainer: Container,
+          transitionTypes: null | TransitionTypes,
+          mutationCallback: () => void,
+          afterMutationCallback: () => void,
+          layoutCallback: () => void,
+          passiveCallback: () => mixed,
+        ): boolean {
+          return false;
+        },
+
+        createViewTransitionInstance(name: string): ViewTransitionInstance {
+          return null;
         },
 
         resetTextContent(instance: Instance): void {
@@ -812,7 +894,7 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
   let currentEventPriority = DefaultEventPriority;
 
   function createJSXElementForTestComparison(type, props) {
-    if (__DEV__ && enableRefAsProp) {
+    if (__DEV__) {
       const element = {
         type: type,
         $$typeof: REACT_ELEMENT_TYPE,
@@ -826,14 +908,6 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
         value: null,
       });
       return element;
-    } else if (!__DEV__ && disableStringRefs) {
-      return {
-        $$typeof: REACT_ELEMENT_TYPE,
-        type: type,
-        key: null,
-        ref: null,
-        props: props,
-      };
     } else {
       return {
         $$typeof: REACT_ELEMENT_TYPE,
@@ -841,8 +915,6 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
         key: null,
         ref: null,
         props: props,
-        _owner: null,
-        _store: __DEV__ ? {} : undefined,
       };
     }
   }
@@ -972,7 +1044,6 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
 
   function onRecoverableError(error) {
     // TODO: Turn this on once tests are fixed
-    // eslint-disable-next-line react-internal/no-production-logging, react-internal/warning-args
     // console.error(error);
   }
 
@@ -1051,8 +1122,12 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
         null,
         false,
         '',
-        NoopRenderer.defaultOnUncaughtError,
-        NoopRenderer.defaultOnCaughtError,
+        options && options.onUncaughtError
+          ? options.onUncaughtError
+          : NoopRenderer.defaultOnUncaughtError,
+        options && options.onCaughtError
+          ? options.onCaughtError
+          : NoopRenderer.defaultOnCaughtError,
         onRecoverableError,
         options && options.unstable_transitionCallbacks
           ? options.unstable_transitionCallbacks

@@ -10,11 +10,14 @@
 import type {Dispatcher} from 'react-reconciler/src/ReactInternalTypes';
 import type {AsyncDispatcher} from 'react-reconciler/src/ReactInternalTypes';
 import type {BatchConfigTransition} from 'react-reconciler/src/ReactFiberTracingMarkerComponent';
+import type {TransitionTypes} from './ReactTransitionType';
 
 export type SharedStateClient = {
   H: null | Dispatcher, // ReactCurrentDispatcher for Hooks
   A: null | AsyncDispatcher, // ReactCurrentCache for Cache
   T: null | BatchConfigTransition, // ReactCurrentBatchConfig for Transitions
+  S: null | ((BatchConfigTransition, mixed) => void), // onStartTransitionFinish
+  V: null | TransitionTypes, // Pending Transition Types for the Next Transition
 
   // DEV-only
 
@@ -34,9 +37,7 @@ export type SharedStateClient = {
   thrownErrors: Array<mixed>,
 
   // ReactDebugCurrentFrame
-  setExtraStackFrame: (stack: null | string) => void,
   getCurrentStack: null | (() => string),
-  getStackAddendum: () => string,
 };
 
 export type RendererTask = boolean => RendererTask | null;
@@ -45,6 +46,8 @@ const ReactSharedInternals: SharedStateClient = ({
   H: null,
   A: null,
   T: null,
+  S: null,
+  V: null,
 }: any);
 
 if (__DEV__) {
@@ -53,30 +56,8 @@ if (__DEV__) {
   ReactSharedInternals.didScheduleLegacyUpdate = false;
   ReactSharedInternals.didUsePromise = false;
   ReactSharedInternals.thrownErrors = [];
-
-  let currentExtraStackFrame = (null: null | string);
-  ReactSharedInternals.setExtraStackFrame = function (stack: null | string) {
-    currentExtraStackFrame = stack;
-  };
   // Stack implementation injected by the current renderer.
   ReactSharedInternals.getCurrentStack = (null: null | (() => string));
-
-  ReactSharedInternals.getStackAddendum = function (): string {
-    let stack = '';
-
-    // Add an extra top frame while an element is being validated
-    if (currentExtraStackFrame) {
-      stack += currentExtraStackFrame;
-    }
-
-    // Delegate to the injected renderer-specific implementation
-    const impl = ReactSharedInternals.getCurrentStack;
-    if (impl) {
-      stack += impl() || '';
-    }
-
-    return stack;
-  };
 }
 
 export default ReactSharedInternals;

@@ -13,6 +13,7 @@ let ReactNoop;
 let Scheduler;
 let act;
 let assertLog;
+let useMemo;
 let useState;
 let useMemoCache;
 let MemoCacheSentinel;
@@ -27,6 +28,7 @@ describe('useMemoCache()', () => {
     Scheduler = require('scheduler');
     act = require('internal-test-utils').act;
     assertLog = require('internal-test-utils').assertLog;
+    useMemo = React.useMemo;
     useMemoCache = require('react/compiler-runtime').c;
     useState = React.useState;
     MemoCacheSentinel = Symbol.for('react.memo_cache_sentinel');
@@ -56,8 +58,7 @@ describe('useMemoCache()', () => {
     ErrorBoundary = _ErrorBoundary;
   });
 
-  // @gate enableUseMemoCacheHook
-  test('render component using cache', async () => {
+  it('render component using cache', async () => {
     function Component(props) {
       const cache = useMemoCache(1);
       expect(Array.isArray(cache)).toBe(true);
@@ -73,8 +74,7 @@ describe('useMemoCache()', () => {
     expect(root).toMatchRenderedOutput('Ok');
   });
 
-  // @gate enableUseMemoCacheHook
-  test('update component using cache', async () => {
+  it('update component using cache', async () => {
     let setX;
     let forceUpdate;
     function Component(props) {
@@ -143,8 +143,7 @@ describe('useMemoCache()', () => {
     expect(data).toBe(data1); // confirm that the cache persisted across renders
   });
 
-  // @gate enableUseMemoCacheHook
-  test('update component using cache with setstate during render', async () => {
+  it('update component using cache with setstate during render', async () => {
     let setN;
     function Component(props) {
       const cache = useMemoCache(5);
@@ -208,8 +207,7 @@ describe('useMemoCache()', () => {
     expect(data).toBe(data0);
   });
 
-  // @gate enableUseMemoCacheHook
-  test('update component using cache with throw during render', async () => {
+  it('update component using cache with throw during render', async () => {
     let setN;
     let shouldFail = true;
     function Component(props) {
@@ -291,8 +289,7 @@ describe('useMemoCache()', () => {
     expect(data).toBe(data1); // confirm that the cache persisted across renders
   });
 
-  // @gate enableUseMemoCacheHook
-  test('update component and custom hook with caches', async () => {
+  it('update component and custom hook with caches', async () => {
     let setX;
     let forceUpdate;
     function Component(props) {
@@ -368,8 +365,7 @@ describe('useMemoCache()', () => {
     expect(data).toBe(data1); // confirm that the cache persisted across renders
   });
 
-  // @gate enableUseMemoCacheHook
-  test('reuses computations from suspended/interrupted render attempts during an update', async () => {
+  it('reuses computations from suspended/interrupted render attempts during an update', async () => {
     // This test demonstrates the benefit of a shared memo cache. By "shared" I
     // mean multiple concurrent render attempts of the same component/hook use
     // the same cache. (When the feature flag is off, we don't do this — the
@@ -620,5 +616,57 @@ describe('useMemoCache()', () => {
         <div>Data: A2B2</div>
       </>,
     );
+  });
+
+  it('(repro) infinite renders when used with setState during render', async () => {
+    // Output of react compiler on `useUserMemo`
+    function useCompilerMemo(value) {
+      let arr;
+      const $ = useMemoCache(2);
+      if ($[0] !== value) {
+        arr = [value];
+        $[0] = value;
+        $[1] = arr;
+      } else {
+        arr = $[1];
+      }
+      return arr;
+    }
+
+    // Baseline / source code
+    function useManualMemo(value) {
+      return useMemo(() => [value], [value]);
+    }
+
+    function makeComponent(hook) {
+      return function Component({value}) {
+        const state = hook(value);
+        const [prevState, setPrevState] = useState(null);
+        if (state !== prevState) {
+          setPrevState(state);
+        }
+        return <div>{state.join(',')}</div>;
+      };
+    }
+
+    /**
+     * Test with useMemoCache
+     */
+    let root = ReactNoop.createRoot();
+    const CompilerMemoComponent = makeComponent(useCompilerMemo);
+    await act(() => {
+      root.render(<CompilerMemoComponent value={2} />);
+    });
+    expect(root).toMatchRenderedOutput(<div>2</div>);
+
+    /**
+     * Test with useMemo
+     */
+    root = ReactNoop.createRoot();
+    const HookMemoComponent = makeComponent(useManualMemo);
+    await act(() => {
+      root.render(<HookMemoComponent value={2} />);
+    });
+    expect(root).toMatchRenderedOutput(<div>2</div>);
   });
 });

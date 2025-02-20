@@ -7,7 +7,6 @@ const {
   readFileSync,
   writeFileSync,
 } = require('fs');
-const path = require('path');
 const Bundles = require('./bundles');
 const {
   asyncCopyTo,
@@ -15,7 +14,6 @@ const {
   asyncExtractTar,
   asyncRimRaf,
 } = require('./utils');
-const {getSigningToken, signFile} = require('signedsource');
 
 const {
   NODE_ES2015,
@@ -36,6 +34,8 @@ const {
   RN_FB_PROD,
   RN_FB_PROFILING,
   BROWSER_SCRIPT,
+  CJS_DTS,
+  ESM_DTS,
 } = Bundles.bundleTypes;
 
 function getPackageName(name) {
@@ -51,6 +51,7 @@ function getBundleOutputPath(bundle, bundleType, filename, packageName) {
       return `build/node_modules/${packageName}/cjs/${filename}`;
     case ESM_DEV:
     case ESM_PROD:
+    case ESM_DTS:
       return `build/node_modules/${packageName}/esm/${filename}`;
     case BUN_DEV:
     case BUN_PROD:
@@ -58,6 +59,7 @@ function getBundleOutputPath(bundle, bundleType, filename, packageName) {
     case NODE_DEV:
     case NODE_PROD:
     case NODE_PROFILING:
+    case CJS_DTS:
       return `build/node_modules/${packageName}/cjs/${filename}`;
     case FB_WWW_DEV:
     case FB_WWW_PROD:
@@ -78,6 +80,7 @@ function getBundleOutputPath(bundle, bundleType, filename, packageName) {
       switch (packageName) {
         case 'scheduler':
         case 'react':
+        case 'react-dom':
         case 'react-is':
         case 'react-test-renderer':
           return `build/facebook-react-native/${packageName}/cjs/${filename}`;
@@ -127,24 +130,6 @@ async function copyRNShims() {
     require.resolve('react-native-renderer/src/ReactNativeTypes.js'),
     'build/react-native/shims/ReactNativeTypes.js'
   );
-  processGenerated('build/react-native/shims');
-}
-
-function processGenerated(directory) {
-  const files = readdirSync(directory)
-    .filter(dir => dir.endsWith('.js'))
-    .map(file => path.join(directory, file));
-
-  files.forEach(file => {
-    const originalContents = readFileSync(file, 'utf8');
-    const contents = originalContents
-      // Replace {@}format with {@}noformat
-      .replace(/(\r?\n\s*\*\s*)@format\b.*(\n)/, '$1@noformat$2')
-      // Add {@}nolint and {@}generated
-      .replace(/(\r?\n\s*\*)\//, `$1 @nolint$1 ${getSigningToken()}$1/`);
-    const signedContents = signFile(contents);
-    writeFileSync(file, signedContents, 'utf8');
-  });
 }
 
 async function copyAllShims() {

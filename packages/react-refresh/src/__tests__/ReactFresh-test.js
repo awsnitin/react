@@ -7,8 +7,6 @@
  * @emails react-core
  */
 
-/* eslint-disable no-for-of-loops/no-for-of-loops */
-
 'use strict';
 
 let React;
@@ -698,6 +696,242 @@ describe('ReactFresh', () => {
       const newEl = container.firstChild;
       expect(newEl.textContent).toBe('0');
       expect(newEl.style.color).toBe('blue');
+    }
+  });
+
+  it('can remount when change function to memo', async () => {
+    if (__DEV__) {
+      await act(async () => {
+        await render(() => {
+          function Test() {
+            return <p>hi test</p>;
+          }
+          $RefreshReg$(Test, 'Test');
+          return Test;
+        });
+      });
+
+      // Check the initial render
+      const el = container.firstChild;
+      expect(el.textContent).toBe('hi test');
+
+      // Patch to change function to memo
+      await act(async () => {
+        await patch(() => {
+          function Test2() {
+            return <p>hi memo</p>;
+          }
+          const Test = React.memo(Test2);
+          $RefreshReg$(Test2, 'Test2');
+          $RefreshReg$(Test, 'Test');
+          return Test;
+        });
+      });
+
+      // Check remount
+      expect(container.firstChild).not.toBe(el);
+      const nextEl = container.firstChild;
+      expect(nextEl.textContent).toBe('hi memo');
+
+      // Patch back to original function
+      await act(async () => {
+        await patch(() => {
+          function Test() {
+            return <p>hi test</p>;
+          }
+          $RefreshReg$(Test, 'Test');
+          return Test;
+        });
+      });
+
+      // Check final remount
+      expect(container.firstChild).not.toBe(nextEl);
+      const newEl = container.firstChild;
+      expect(newEl.textContent).toBe('hi test');
+    }
+  });
+
+  it('can remount when change memo to forwardRef', async () => {
+    if (__DEV__) {
+      await act(async () => {
+        await render(() => {
+          function Test2() {
+            return <p>hi memo</p>;
+          }
+          const Test = React.memo(Test2);
+          $RefreshReg$(Test2, 'Test2');
+          $RefreshReg$(Test, 'Test');
+          return Test;
+        });
+      });
+      // Check the initial render
+      const el = container.firstChild;
+      expect(el.textContent).toBe('hi memo');
+
+      // Patch to change memo to forwardRef
+      await act(async () => {
+        await patch(() => {
+          function Test2() {
+            return <p>hi forwardRef</p>;
+          }
+          const Test = React.forwardRef(Test2);
+          $RefreshReg$(Test2, 'Test2');
+          $RefreshReg$(Test, 'Test');
+          return Test;
+        });
+      });
+      // Check remount
+      expect(container.firstChild).not.toBe(el);
+      const nextEl = container.firstChild;
+      expect(nextEl.textContent).toBe('hi forwardRef');
+
+      // Patch back to memo
+      await act(async () => {
+        await patch(() => {
+          function Test2() {
+            return <p>hi memo</p>;
+          }
+          const Test = React.memo(Test2);
+          $RefreshReg$(Test2, 'Test2');
+          $RefreshReg$(Test, 'Test');
+          return Test;
+        });
+      });
+      // Check final remount
+      expect(container.firstChild).not.toBe(nextEl);
+      const newEl = container.firstChild;
+      expect(newEl.textContent).toBe('hi memo');
+    }
+  });
+
+  it('can remount when change function to forwardRef', async () => {
+    if (__DEV__) {
+      await act(async () => {
+        await render(() => {
+          function Test() {
+            return <p>hi test</p>;
+          }
+          $RefreshReg$(Test, 'Test');
+          return Test;
+        });
+      });
+
+      // Check the initial render
+      const el = container.firstChild;
+      expect(el.textContent).toBe('hi test');
+
+      // Patch to change function to forwardRef
+      await act(async () => {
+        await patch(() => {
+          function Test2() {
+            return <p>hi forwardRef</p>;
+          }
+          const Test = React.forwardRef(Test2);
+          $RefreshReg$(Test2, 'Test2');
+          $RefreshReg$(Test, 'Test');
+          return Test;
+        });
+      });
+
+      // Check remount
+      expect(container.firstChild).not.toBe(el);
+      const nextEl = container.firstChild;
+      expect(nextEl.textContent).toBe('hi forwardRef');
+
+      // Patch back to a new function
+      await act(async () => {
+        await patch(() => {
+          function Test() {
+            return <p>hi test1</p>;
+          }
+          $RefreshReg$(Test, 'Test');
+          return Test;
+        });
+      });
+
+      // Check final remount
+      expect(container.firstChild).not.toBe(nextEl);
+      const newEl = container.firstChild;
+      expect(newEl.textContent).toBe('hi test1');
+    }
+  });
+
+  it('resets state when switching between different component types', async () => {
+    if (__DEV__) {
+      await act(async () => {
+        await render(() => {
+          function Test() {
+            const [count, setCount] = React.useState(0);
+            return (
+              <div onClick={() => setCount(c => c + 1)}>count: {count}</div>
+            );
+          }
+          $RefreshReg$(Test, 'Test');
+          return Test;
+        });
+      });
+
+      expect(container.firstChild.textContent).toBe('count: 0');
+      await act(async () => {
+        container.firstChild.click();
+      });
+      expect(container.firstChild.textContent).toBe('count: 1');
+
+      await act(async () => {
+        await patch(() => {
+          function Test2() {
+            const [count, setCount] = React.useState(0);
+            return (
+              <div onClick={() => setCount(c => c + 1)}>count: {count}</div>
+            );
+          }
+          const Test = React.memo(Test2);
+          $RefreshReg$(Test2, 'Test2');
+          $RefreshReg$(Test, 'Test');
+          return Test;
+        });
+      });
+
+      expect(container.firstChild.textContent).toBe('count: 0');
+      await act(async () => {
+        container.firstChild.click();
+      });
+      expect(container.firstChild.textContent).toBe('count: 1');
+
+      await act(async () => {
+        await patch(() => {
+          const Test = React.forwardRef((props, ref) => {
+            const [count, setCount] = React.useState(0);
+            const handleClick = () => setCount(c => c + 1);
+
+            // Ensure ref is extensible
+            const divRef = React.useRef(null);
+            React.useEffect(() => {
+              if (ref) {
+                if (typeof ref === 'function') {
+                  ref(divRef.current);
+                } else if (Object.isExtensible(ref)) {
+                  ref.current = divRef.current;
+                }
+              }
+            }, [ref]);
+
+            return (
+              <div ref={divRef} onClick={handleClick}>
+                count: {count}
+              </div>
+            );
+          });
+          $RefreshReg$(Test, 'Test');
+          return Test;
+        });
+      });
+
+      expect(container.firstChild.textContent).toBe('count: 0');
+      await act(async () => {
+        container.firstChild.click();
+      });
+      expect(container.firstChild.textContent).toBe('count: 1');
     }
   });
 
@@ -2441,7 +2675,7 @@ describe('ReactFresh', () => {
     }
   });
 
-  // @gate www && __DEV__
+  // @gate enableLegacyHidden && __DEV__
   it('can hot reload offscreen components', async () => {
     const AppV1 = prepare(() => {
       function Hello() {
@@ -3408,114 +3642,6 @@ describe('ReactFresh', () => {
       expect(finalEl.textContent).toBe('1');
     }
   });
-
-  it('can find host instances for a family', async () => {
-    if (__DEV__) {
-      await render(() => {
-        function Child({children}) {
-          return <div className="Child">{children}</div>;
-        }
-        $RefreshReg$(Child, 'Child');
-
-        function Parent({children}) {
-          return (
-            <div className="Parent">
-              <div>
-                <Child />
-              </div>
-              <div>
-                <Child />
-              </div>
-            </div>
-          );
-        }
-        $RefreshReg$(Parent, 'Parent');
-
-        function App() {
-          return (
-            <div className="App">
-              <Parent />
-              <Cls>
-                <Parent />
-              </Cls>
-              <Indirection>
-                <Empty />
-              </Indirection>
-            </div>
-          );
-        }
-        $RefreshReg$(App, 'App');
-
-        class Cls extends React.Component {
-          render() {
-            return this.props.children;
-          }
-        }
-
-        function Indirection({children}) {
-          return children;
-        }
-
-        function Empty() {
-          return null;
-        }
-        $RefreshReg$(Empty, 'Empty');
-
-        function Frag() {
-          return (
-            <>
-              <div className="Frag">
-                <div />
-              </div>
-              <div className="Frag">
-                <div />
-              </div>
-            </>
-          );
-        }
-        $RefreshReg$(Frag, 'Frag');
-
-        return App;
-      });
-
-      const parentFamily = ReactFreshRuntime.getFamilyByID('Parent');
-      const childFamily = ReactFreshRuntime.getFamilyByID('Child');
-      const emptyFamily = ReactFreshRuntime.getFamilyByID('Empty');
-
-      testFindHostInstancesForFamilies(
-        [parentFamily],
-        container.querySelectorAll('.Parent'),
-      );
-
-      testFindHostInstancesForFamilies(
-        [childFamily],
-        container.querySelectorAll('.Child'),
-      );
-
-      // When searching for both Parent and Child,
-      // we'll stop visual highlighting at the Parent.
-      testFindHostInstancesForFamilies(
-        [parentFamily, childFamily],
-        container.querySelectorAll('.Parent'),
-      );
-
-      // When we can't find host nodes, use the closest parent.
-      testFindHostInstancesForFamilies(
-        [emptyFamily],
-        container.querySelectorAll('.App'),
-      );
-    }
-  });
-
-  function testFindHostInstancesForFamilies(families, expectedNodes) {
-    const foundInstances = Array.from(
-      ReactFreshRuntime.findAffectedHostInstances(families),
-    );
-    expect(foundInstances.length).toEqual(expectedNodes.length);
-    foundInstances.forEach((node, i) => {
-      expect(node).toBe(expectedNodes[i]);
-    });
-  }
 
   it('can update multiple roots independently', async () => {
     if (__DEV__) {

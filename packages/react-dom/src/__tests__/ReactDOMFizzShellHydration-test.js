@@ -167,7 +167,7 @@ describe('ReactDOMFizzShellHydration', () => {
     textCache = new Map();
   }
 
-  test('suspending in the shell during hydration', async () => {
+  it('suspending in the shell during hydration', async () => {
     const div = React.createRef(null);
 
     function App() {
@@ -207,7 +207,7 @@ describe('ReactDOMFizzShellHydration', () => {
     expect(container.textContent).toBe('Shell');
   });
 
-  test('suspending in the shell during a normal client render', async () => {
+  it('suspending in the shell during a normal client render', async () => {
     // Same as previous test but during a normal client render, no hydration
     function App() {
       return <AsyncText text="Shell" />;
@@ -226,7 +226,7 @@ describe('ReactDOMFizzShellHydration', () => {
     expect(container.textContent).toBe('Shell');
   });
 
-  test(
+  it(
     'updating the root at lower priority than initial hydration does not ' +
       'force a client render',
     async () => {
@@ -255,7 +255,40 @@ describe('ReactDOMFizzShellHydration', () => {
     },
   );
 
-  test('updating the root while the shell is suspended forces a client render', async () => {
+  // @gate enableHydrationLaneScheduling
+  it(
+    'updating the root at same priority as initial hydration does not ' +
+      'force a client render',
+    async () => {
+      function App() {
+        return <Text text="Initial" />;
+      }
+
+      // Server render
+      await resolveText('Initial');
+      await serverAct(async () => {
+        const {pipe} = ReactDOMFizzServer.renderToPipeableStream(<App />);
+        pipe(writable);
+      });
+      assertLog(['Initial']);
+
+      await clientAct(async () => {
+        let root;
+        startTransition(() => {
+          root = ReactDOMClient.hydrateRoot(container, <App />);
+        });
+        // This has lower priority than the initial hydration, so the update
+        // won't be processed until after hydration finishes.
+        startTransition(() => {
+          root.render(<Text text="Updated" />);
+        });
+      });
+      assertLog(['Initial', 'Updated']);
+      expect(container.textContent).toBe('Updated');
+    },
+  );
+
+  it('updating the root while the shell is suspended forces a client render', async () => {
     function App() {
       return <AsyncText text="Shell" />;
     }
@@ -293,7 +326,7 @@ describe('ReactDOMFizzShellHydration', () => {
     expect(container.textContent).toBe('New screen');
   });
 
-  test('TODO: A large component stack causes SSR to stack overflow', async () => {
+  it('TODO: A large component stack causes SSR to stack overflow', async () => {
     spyOnDevAndProd(console, 'error').mockImplementation(() => {});
 
     function NestedComponent({depth}: {depth: number}) {

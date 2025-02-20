@@ -25,7 +25,7 @@ describe('ReactFiberRefs', () => {
     assertLog = require('internal-test-utils').assertLog;
   });
 
-  test('ref is attached even if there are no other updates (class)', async () => {
+  it('ref is attached even if there are no other updates (class)', async () => {
     let component;
     class Component extends React.Component {
       shouldComponentUpdate() {
@@ -61,7 +61,7 @@ describe('ReactFiberRefs', () => {
     expect(ref2.current).toBe(component);
   });
 
-  test('ref is attached even if there are no other updates (host component)', async () => {
+  it('ref is attached even if there are no other updates (host component)', async () => {
     // This is kind of ailly test because host components never bail out if they
     // receive a new element, and there's no way to update a ref without also
     // updating the props, but adding it here anyway for symmetry with the
@@ -85,37 +85,7 @@ describe('ReactFiberRefs', () => {
     expect(ref2.current).not.toBe(null);
   });
 
-  // @gate enableRefAsProp
-  // @gate !disableStringRefs
-  test('string ref props are converted to function refs', async () => {
-    let refProp;
-    function Child({ref}) {
-      refProp = ref;
-      return <div ref={ref} />;
-    }
-
-    let owner;
-    class Owner extends React.Component {
-      render() {
-        owner = this;
-        return <Child ref="child" />;
-      }
-    }
-
-    const root = ReactNoop.createRoot();
-    await act(() => root.render(<Owner />));
-
-    // When string refs aren't disabled, and enableRefAsProp is on, string refs
-    // the receiving component receives a callback ref, not the original string.
-    // This behavior should never be shipped to open source; it's only here to
-    // allow Meta to keep using string refs temporarily while they finish
-    // migrating their codebase.
-    expect(typeof refProp === 'function').toBe(true);
-    expect(owner.refs.child.type).toBe('div');
-  });
-
-  // @gate disableStringRefs
-  test('throw if a string ref is passed to a ref-receiving component', async () => {
+  it('throw if a string ref is passed to a ref-receiving component', async () => {
     let refProp;
     function Child({ref}) {
       // This component renders successfully because the ref type check does not
@@ -139,7 +109,7 @@ describe('ReactFiberRefs', () => {
     expect(refProp).toBe('child');
   });
 
-  test('strings refs can be codemodded to callback refs', async () => {
+  it('strings refs can be codemodded to callback refs', async () => {
     let app;
     class App extends React.Component {
       render() {
@@ -163,7 +133,7 @@ describe('ReactFiberRefs', () => {
     expect(app.refs.div.prop).toBe('Hello!');
   });
 
-  test('class refs are initialized to a frozen shared object', async () => {
+  it('class refs are initialized to a frozen shared object', async () => {
     const refsCollection = new Set();
     class Component extends React.Component {
       constructor(props) {

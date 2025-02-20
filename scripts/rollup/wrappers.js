@@ -1,6 +1,5 @@
 'use strict';
 
-const {signFile, getSigningToken} = require('signedsource');
 const {bundleTypes, moduleTypes} = require('./bundles');
 
 const {
@@ -22,6 +21,8 @@ const {
   RN_FB_PROD,
   RN_FB_PROFILING,
   BROWSER_SCRIPT,
+  CJS_DTS,
+  ESM_DTS,
 } = bundleTypes;
 
 const {RECONCILER} = moduleTypes;
@@ -249,6 +250,16 @@ ${source}
   Object.defineProperty(module.exports, "__esModule", { value: true });
   `;
   },
+
+  /***************** CJS_DTS *****************/
+  [CJS_DTS](source, globalName, filename, moduleType) {
+    return source;
+  },
+
+  /***************** ESM_DTS *****************/
+  [ESM_DTS](source, globalName, filename, moduleType) {
+    return source;
+  },
 };
 
 const licenseHeaderWrappers = {
@@ -392,86 +403,104 @@ ${source}`;
 
   /****************** RN_OSS_DEV ******************/
   [RN_OSS_DEV](source, globalName, filename, moduleType) {
-    return signFile(`/**
+    return `/**
 ${license}
  *
  * @noflow
  * @nolint
  * @preventMunge
- * ${getSigningToken()}
  */
 
-${source}`);
+${source}`;
   },
 
   /****************** RN_OSS_PROD ******************/
   [RN_OSS_PROD](source, globalName, filename, moduleType) {
-    return signFile(`/**
+    return `/**
 ${license}
  *
  * @noflow
  * @nolint
  * @preventMunge
- * ${getSigningToken()}
  */
 
-${source}`);
+${source}`;
   },
 
   /****************** RN_OSS_PROFILING ******************/
   [RN_OSS_PROFILING](source, globalName, filename, moduleType) {
-    return signFile(`/**
+    return `/**
 ${license}
  *
  * @noflow
  * @nolint
  * @preventMunge
- * ${getSigningToken()}
  */
 
-${source}`);
+${source}`;
   },
 
   /****************** RN_FB_DEV ******************/
   [RN_FB_DEV](source, globalName, filename, moduleType) {
-    return signFile(`/**
+    return `/**
 ${license}
  *
  * @noflow
  * @nolint
  * @preventMunge
- * ${getSigningToken()}
  */
 
-${source}`);
+${source}`;
   },
 
   /****************** RN_FB_PROD ******************/
   [RN_FB_PROD](source, globalName, filename, moduleType) {
-    return signFile(`/**
+    return `/**
 ${license}
  *
  * @noflow
  * @nolint
  * @preventMunge
- * ${getSigningToken()}
  */
 
-${source}`);
+${source}`;
   },
 
   /****************** RN_FB_PROFILING ******************/
   [RN_FB_PROFILING](source, globalName, filename, moduleType) {
-    return signFile(`/**
+    return `/**
 ${license}
  *
  * @noflow
  * @nolint
  * @preventMunge
- * ${getSigningToken()}
  */
 
-${source}`);
+${source}`;
+  },
+
+  /***************** CJS_DTS *****************/
+  [CJS_DTS](source, globalName, filename, moduleType) {
+    return `/**
+ * @license React
+ * ${filename}
+ *
+${license}
+ */
+
+${source}`;
+  },
+
+  /***************** ESM_DTS *****************/
+  [ESM_DTS](source, globalName, filename, moduleType) {
+    return `/**
+ * @license React
+ * ${filename}
+ *
+${license}
+ */
+
+${source}`;
   },
 };
 

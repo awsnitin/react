@@ -8,8 +8,6 @@
  * @jest-environment node
  */
 
-/* eslint-disable no-func-assign */
-
 'use strict';
 
 describe('useRef', () => {
@@ -29,9 +27,6 @@ describe('useRef', () => {
     React = require('react');
     ReactNoop = require('react-noop-renderer');
     Scheduler = require('scheduler');
-
-    const ReactFeatureFlags = require('shared/ReactFeatureFlags');
-    ReactFeatureFlags.debugRenderPhaseSideEffectsForStrictMode = false;
 
     act = require('internal-test-utils').act;
     useCallback = React.useCallback;

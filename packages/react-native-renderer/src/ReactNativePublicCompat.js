@@ -25,14 +25,17 @@ import {
 } from 'react-reconciler/src/ReactFiberReconciler';
 import {doesFiberContain} from 'react-reconciler/src/ReactFiberTreeReflection';
 import getComponentNameFromType from 'shared/getComponentNameFromType';
-import {currentOwner} from 'react-reconciler/src/ReactFiberCurrentOwner';
+import {
+  current as currentOwner,
+  isRendering,
+} from 'react-reconciler/src/ReactCurrentFiber';
 
 export function findHostInstance_DEPRECATED<TElementType: ElementType>(
   componentOrHandle: ?(ElementRef<TElementType> | number),
-): ?ElementRef<HostComponent<mixed>> {
+): ?ElementRef<HostComponent<{...}>> {
   if (__DEV__) {
     const owner = currentOwner;
-    if (owner !== null && owner.stateNode !== null) {
+    if (owner !== null && isRendering && owner.stateNode !== null) {
       if (!owner.stateNode._warnedAboutRefsInRender) {
         console.error(
           '%s is accessing findNodeHandle inside its render(). ' +
@@ -87,7 +90,7 @@ export function findHostInstance_DEPRECATED<TElementType: ElementType>(
 export function findNodeHandle(componentOrHandle: any): ?number {
   if (__DEV__) {
     const owner = currentOwner;
-    if (owner !== null && owner.stateNode !== null) {
+    if (owner !== null && isRendering && owner.stateNode !== null) {
       if (!owner.stateNode._warnedAboutRefsInRender) {
         console.error(
           '%s is accessing findNodeHandle inside its render(). ' +
@@ -222,7 +225,7 @@ export function getNodeFromInternalInstanceHandle(
 // Should have been PublicInstance from ReactFiberConfigFabric
 type FabricPublicInstance = mixed;
 // Should have been PublicInstance from ReactFiberConfigNative
-type PaperPublicInstance = HostComponent<mixed>;
+type PaperPublicInstance = HostComponent<empty>;
 
 // Remove this once Paper is no longer supported and DOM Node API are enabled by default in RN.
 export function isChildPublicInstance(

@@ -13,6 +13,7 @@ let PropTypes;
 let React;
 let ReactDOM;
 let act;
+let assertConsoleErrorDev;
 
 // TODO: Refactor this test once componentDidCatch setState is deprecated.
 describe('ReactLegacyErrorBoundaries', () => {
@@ -42,6 +43,8 @@ describe('ReactLegacyErrorBoundaries', () => {
     ReactDOM = require('react-dom');
     React = require('react');
     act = require('internal-test-utils').act;
+    assertConsoleErrorDev =
+      require('internal-test-utils').assertConsoleErrorDev;
 
     log = [];
 
@@ -705,7 +708,7 @@ describe('ReactLegacyErrorBoundaries', () => {
         'ReactDOM.render has not been supported since React 18',
       );
       expect(console.error.mock.calls[1][2]).toContain(
-        'The above error occurred in the <BrokenRender> component:',
+        'The above error occurred in the <BrokenRender> component',
       );
     }
 
@@ -846,6 +849,11 @@ describe('ReactLegacyErrorBoundaries', () => {
       </ErrorBoundary>,
       container,
     );
+    assertConsoleErrorDev([
+      'BrokenComponentWillMountWithContext uses the legacy childContextTypes API which will soon be removed. ' +
+        'Use React.createContext() instead. (https://react.dev/link/legacy-context)\n' +
+        '    in BrokenComponentWillMountWithContext (at **)',
+    ]);
     expect(container.firstChild.textContent).toBe('Caught an error: Hello.');
   });
 
@@ -2099,50 +2107,57 @@ describe('ReactLegacyErrorBoundaries', () => {
     const Y = undefined;
 
     await expect(async () => {
-      await expect(async () => {
-        const container = document.createElement('div');
-        await act(() => {
-          ReactDOM.render(<X />, container);
-        });
-      }).rejects.toThrow('got: null');
-    }).toErrorDev(
-      'Warning: React.jsx: type is invalid -- expected a string ' +
-        '(for built-in components) or a class/function ' +
-        '(for composite components) but got: null.',
-      {withoutStack: 1},
-    );
+      const container = document.createElement('div');
+      await act(() => {
+        ReactDOM.render(<X />, container);
+      });
+    }).rejects.toThrow('got: null');
+    if (gate(flags => !flags.enableOwnerStacks)) {
+      assertConsoleErrorDev(
+        [
+          'React.jsx: type is invalid -- expected a string ' +
+            '(for built-in components) or a class/function ' +
+            '(for composite components) but got: null.',
+        ],
+        {withoutStack: true},
+      );
+    }
 
     await expect(async () => {
-      await expect(async () => {
-        const container = document.createElement('div');
-        await act(() => {
-          ReactDOM.render(<Y />, container);
-        });
-      }).rejects.toThrow('got: undefined');
-    }).toErrorDev(
-      'Warning: React.jsx: type is invalid -- expected a string ' +
-        '(for built-in components) or a class/function ' +
-        '(for composite components) but got: undefined.',
-      {withoutStack: 1},
-    );
+      const container = document.createElement('div');
+      await act(() => {
+        ReactDOM.render(<Y />, container);
+      });
+    }).rejects.toThrow('got: undefined');
+    if (gate(flags => !flags.enableOwnerStacks)) {
+      assertConsoleErrorDev(
+        [
+          'React.jsx: type is invalid -- expected a string ' +
+            '(for built-in components) or a class/function ' +
+            '(for composite components) but got: undefined.',
+        ],
+        {withoutStack: true},
+      );
+    }
   });
 
   // @gate !disableLegacyMode
   it('renders empty output if error boundary does not handle the error', async () => {
     const container = document.createElement('div');
-    expect(() => {
-      ReactDOM.render(
-        <div>
-          Sibling
-          <NoopErrorBoundary>
-            <BrokenRender />
-          </NoopErrorBoundary>
-        </div>,
-        container,
-      );
-    }).toErrorDev(
-      'ErrorBoundary: Error boundaries should implement getDerivedStateFromError()',
+    ReactDOM.render(
+      <div>
+        Sibling
+        <NoopErrorBoundary>
+          <BrokenRender />
+        </NoopErrorBoundary>
+      </div>,
+      container,
     );
+    assertConsoleErrorDev([
+      'NoopErrorBoundary: Error boundaries should implement getDerivedStateFromError(). ' +
+        'In that method, return a state update to display an error message or fallback UI.\n' +
+        '    in NoopErrorBoundary (at **)',
+    ]);
     expect(container.firstChild.textContent).toBe('Sibling');
     expect(log).toEqual([
       'NoopErrorBoundary constructor',

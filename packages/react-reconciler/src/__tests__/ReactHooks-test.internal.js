@@ -13,7 +13,6 @@
 'use strict';
 
 let React;
-let ReactFeatureFlags;
 let ReactTestRenderer;
 let Scheduler;
 let ReactDOMServer;
@@ -26,8 +25,6 @@ let waitForThrow;
 describe('ReactHooks', () => {
   beforeEach(() => {
     jest.resetModules();
-    ReactFeatureFlags = require('shared/ReactFeatureFlags');
-
     React = require('react');
     ReactTestRenderer = require('react-test-renderer');
     Scheduler = require('scheduler');
@@ -242,17 +239,18 @@ describe('ReactHooks', () => {
     await waitForAll(['Count: 0']);
     expect(root).toMatchRenderedOutput('0');
 
-    await expect(async () => {
-      await act(() =>
-        setCounter(1, () => {
-          throw new Error('Expected to ignore the callback.');
-        }),
-      );
-    }).toErrorDev(
-      'State updates from the useState() and useReducer() Hooks ' +
-        "don't support the second callback argument. " +
-        'To execute a side effect after rendering, ' +
-        'declare it in the component body with useEffect().',
+    await act(() =>
+      setCounter(1, () => {
+        throw new Error('Expected to ignore the callback.');
+      }),
+    );
+    assertConsoleErrorDev(
+      [
+        'State updates from the useState() and useReducer() Hooks ' +
+          "don't support the second callback argument. " +
+          'To execute a side effect after rendering, ' +
+          'declare it in the component body with useEffect().',
+      ],
       {withoutStack: true},
     );
     assertLog(['Count: 1']);
@@ -276,17 +274,18 @@ describe('ReactHooks', () => {
     await waitForAll(['Count: 0']);
     expect(root).toMatchRenderedOutput('0');
 
-    await expect(async () => {
-      await act(() =>
-        dispatch(1, () => {
-          throw new Error('Expected to ignore the callback.');
-        }),
-      );
-    }).toErrorDev(
-      'State updates from the useState() and useReducer() Hooks ' +
-        "don't support the second callback argument. " +
-        'To execute a side effect after rendering, ' +
-        'declare it in the component body with useEffect().',
+    await act(() =>
+      dispatch(1, () => {
+        throw new Error('Expected to ignore the callback.');
+      }),
+    );
+    assertConsoleErrorDev(
+      [
+        'State updates from the useState() and useReducer() Hooks ' +
+          "don't support the second callback argument. " +
+          'To execute a side effect after rendering, ' +
+          'declare it in the component body with useEffect().',
+      ],
       {withoutStack: true},
     );
     assertLog(['Count: 1']);
@@ -541,13 +540,8 @@ describe('ReactHooks', () => {
       });
     };
 
-    if (gate(flags => flags.enableUnifiedSyncLane)) {
-      // Update at transition priority
-      React.startTransition(() => update(n => n * 100));
-    } else {
-      // Update at normal priority
-      ReactTestRenderer.unstable_batchedUpdates(() => update(n => n * 100));
-    }
+    // Update at transition priority
+    React.startTransition(() => update(n => n * 100));
     // The new state is eagerly computed.
     assertLog(['Compute state (1 -> 100)']);
 
@@ -589,16 +583,17 @@ describe('ReactHooks', () => {
       });
     });
     assertLog(['Did commit: A']);
-    await expect(async () => {
-      await act(() => {
-        root.update(<App dependencies={['A', 'B']} />);
-      });
-    }).toErrorDev([
-      'Warning: The final argument passed to useLayoutEffect changed size ' +
+    await act(() => {
+      root.update(<App dependencies={['A', 'B']} />);
+    });
+    assertConsoleErrorDev([
+      'The final argument passed to useLayoutEffect changed size ' +
         'between renders. The order and size of this array must remain ' +
-        'constant.\n\n' +
+        'constant.\n' +
+        '\n' +
         'Previous: [A]\n' +
-        'Incoming: [A, B]\n',
+        'Incoming: [A, B]\n' +
+        '    in App (at **)',
     ]);
   });
 
@@ -625,14 +620,14 @@ describe('ReactHooks', () => {
     assertLog(['Compute']);
     expect(root).toMatchRenderedOutput('HELLO');
 
-    await expect(async () => {
-      await act(() => {
-        root.update(<App text="Hello" hasDeps={false} />);
-      });
-    }).toErrorDev([
-      'Warning: useMemo received a final argument during this render, but ' +
+    await act(() => {
+      root.update(<App text="Hello" hasDeps={false} />);
+    });
+    assertConsoleErrorDev([
+      'useMemo received a final argument during this render, but ' +
         'not during the previous render. Even though the final argument is ' +
-        'optional, its type cannot change between renders.',
+        'optional, its type cannot change between renders.\n' +
+        '    in App (at **)',
     ]);
   });
 
@@ -647,53 +642,62 @@ describe('ReactHooks', () => {
       return null;
     }
 
-    await expect(async () => {
-      await act(() => {
-        ReactTestRenderer.create(<App deps={'hello'} />, {
-          unstable_isConcurrent: true,
-        });
+    await act(() => {
+      ReactTestRenderer.create(<App deps={'hello'} />, {
+        unstable_isConcurrent: true,
       });
-    }).toErrorDev([
-      'Warning: useEffect received a final argument that is not an array (instead, received `string`). ' +
-        'When specified, the final argument must be an array.',
-      'Warning: useLayoutEffect received a final argument that is not an array (instead, received `string`). ' +
-        'When specified, the final argument must be an array.',
-      'Warning: useMemo received a final argument that is not an array (instead, received `string`). ' +
-        'When specified, the final argument must be an array.',
-      'Warning: useCallback received a final argument that is not an array (instead, received `string`). ' +
-        'When specified, the final argument must be an array.',
+    });
+    assertConsoleErrorDev([
+      'useEffect received a final argument that is not an array (instead, received `string`). ' +
+        'When specified, the final argument must be an array.\n' +
+        '    in App (at **)',
+      'useLayoutEffect received a final argument that is not an array (instead, received `string`). ' +
+        'When specified, the final argument must be an array.\n' +
+        '    in App (at **)',
+      'useMemo received a final argument that is not an array (instead, received `string`). ' +
+        'When specified, the final argument must be an array.\n' +
+        '    in App (at **)',
+      'useCallback received a final argument that is not an array (instead, received `string`). ' +
+        'When specified, the final argument must be an array.\n' +
+        '    in App (at **)',
     ]);
-    await expect(async () => {
-      await act(() => {
-        ReactTestRenderer.create(<App deps={100500} />, {
-          unstable_isConcurrent: true,
-        });
+    await act(() => {
+      ReactTestRenderer.create(<App deps={100500} />, {
+        unstable_isConcurrent: true,
       });
-    }).toErrorDev([
-      'Warning: useEffect received a final argument that is not an array (instead, received `number`). ' +
-        'When specified, the final argument must be an array.',
-      'Warning: useLayoutEffect received a final argument that is not an array (instead, received `number`). ' +
-        'When specified, the final argument must be an array.',
-      'Warning: useMemo received a final argument that is not an array (instead, received `number`). ' +
-        'When specified, the final argument must be an array.',
-      'Warning: useCallback received a final argument that is not an array (instead, received `number`). ' +
-        'When specified, the final argument must be an array.',
+    });
+    assertConsoleErrorDev([
+      'useEffect received a final argument that is not an array (instead, received `number`). ' +
+        'When specified, the final argument must be an array.\n' +
+        '    in App (at **)',
+      'useLayoutEffect received a final argument that is not an array (instead, received `number`). ' +
+        'When specified, the final argument must be an array.\n' +
+        '    in App (at **)',
+      'useMemo received a final argument that is not an array (instead, received `number`). ' +
+        'When specified, the final argument must be an array.\n' +
+        '    in App (at **)',
+      'useCallback received a final argument that is not an array (instead, received `number`). ' +
+        'When specified, the final argument must be an array.\n' +
+        '    in App (at **)',
     ]);
-    await expect(async () => {
-      await act(() => {
-        ReactTestRenderer.create(<App deps={{}} />, {
-          unstable_isConcurrent: true,
-        });
+    await act(() => {
+      ReactTestRenderer.create(<App deps={{}} />, {
+        unstable_isConcurrent: true,
       });
-    }).toErrorDev([
-      'Warning: useEffect received a final argument that is not an array (instead, received `object`). ' +
-        'When specified, the final argument must be an array.',
-      'Warning: useLayoutEffect received a final argument that is not an array (instead, received `object`). ' +
-        'When specified, the final argument must be an array.',
-      'Warning: useMemo received a final argument that is not an array (instead, received `object`). ' +
-        'When specified, the final argument must be an array.',
-      'Warning: useCallback received a final argument that is not an array (instead, received `object`). ' +
-        'When specified, the final argument must be an array.',
+    });
+    assertConsoleErrorDev([
+      'useEffect received a final argument that is not an array (instead, received `object`). ' +
+        'When specified, the final argument must be an array.\n' +
+        '    in App (at **)',
+      'useLayoutEffect received a final argument that is not an array (instead, received `object`). ' +
+        'When specified, the final argument must be an array.\n' +
+        '    in App (at **)',
+      'useMemo received a final argument that is not an array (instead, received `object`). ' +
+        'When specified, the final argument must be an array.\n' +
+        '    in App (at **)',
+      'useCallback received a final argument that is not an array (instead, received `object`). ' +
+        'When specified, the final argument must be an array.\n' +
+        '    in App (at **)',
     ]);
 
     await act(() => {
@@ -716,16 +720,17 @@ describe('ReactHooks', () => {
       useImperativeHandle(ref, () => {}, props.deps);
       return null;
     });
+    App.displayName = 'App';
 
-    await expect(async () => {
-      await act(() => {
-        ReactTestRenderer.create(<App deps={'hello'} />, {
-          unstable_isConcurrent: true,
-        });
+    await act(() => {
+      ReactTestRenderer.create(<App deps={'hello'} />, {
+        unstable_isConcurrent: true,
       });
-    }).toErrorDev([
-      'Warning: useImperativeHandle received a final argument that is not an array (instead, received `string`). ' +
-        'When specified, the final argument must be an array.',
+    });
+    assertConsoleErrorDev([
+      'useImperativeHandle received a final argument that is not an array (instead, received `string`). ' +
+        'When specified, the final argument must be an array.\n' +
+        '    in App (at **)',
     ]);
     await act(() => {
       ReactTestRenderer.create(<App deps={null} />, {
@@ -824,17 +829,18 @@ describe('ReactHooks', () => {
     }
 
     await expect(async () => {
-      await expect(async () => {
-        await act(() => {
-          ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
-        });
-      }).rejects.toThrow('create is not a function');
-    }).toErrorDev([
+      await act(() => {
+        ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
+      });
+    }).rejects.toThrow('create is not a function');
+    assertConsoleErrorDev([
+      'Expected useImperativeHandle() second argument to be a function ' +
+        'that creates a handle. Instead received: undefined.\n' +
+        '    in App (at **)',
       'Expected useImperativeHandle() first argument to either be a ' +
         'ref callback or React.createRef() object. ' +
-        'Instead received: an object with keys {focus}.',
-      'Expected useImperativeHandle() second argument to be a function ' +
-        'that creates a handle. Instead received: undefined.',
+        'Instead received: an object with keys {focus}.\n' +
+        '    in App (at **)',
     ]);
   });
 
@@ -846,14 +852,15 @@ describe('ReactHooks', () => {
       });
       return null;
     });
+    App.displayName = 'App';
 
-    await expect(async () => {
-      await act(() => {
-        ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
-      });
-    }).toErrorDev([
+    await act(() => {
+      ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
+    });
+    assertConsoleErrorDev([
       'Expected useImperativeHandle() second argument to be a function ' +
-        'that creates a handle. Instead received: object.',
+        'that creates a handle. Instead received: object.\n' +
+        '    in App (at **)',
     ]);
   });
 
@@ -939,13 +946,15 @@ describe('ReactHooks', () => {
       });
       return null;
     }
-    await expect(async () => {
-      await act(() => {
-        ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
-      });
-    }).toErrorDev(
-      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks.',
-    );
+    await act(() => {
+      ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
+    });
+    assertConsoleErrorDev([
+      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks. ' +
+        'You can only call Hooks at the top level of your React function. ' +
+        'For more information, see https://react.dev/link/rules-of-hooks\n' +
+        '    in App (at **)',
+    ]);
   });
 
   it('warns when reading context inside useMemo', async () => {
@@ -960,11 +969,16 @@ describe('ReactHooks', () => {
       }, []);
     }
 
-    await expect(async () => {
-      await act(() => {
-        ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
-      });
-    }).toErrorDev('Context can only be read while React is rendering');
+    await act(() => {
+      ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
+    });
+    assertConsoleErrorDev([
+      'Context can only be read while React is rendering. ' +
+        'In classes, you can read it in the render method or getDerivedStateFromProps. ' +
+        'In function components, you can read it directly in the function body, ' +
+        'but not inside Hooks like useReducer() or useMemo().\n' +
+        '    in App (at **)',
+    ]);
   });
 
   it('warns when reading context inside useMemo after reading outside it', async () => {
@@ -983,11 +997,16 @@ describe('ReactHooks', () => {
       }, []);
     }
 
-    await expect(async () => {
-      await act(() => {
-        ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
-      });
-    }).toErrorDev('Context can only be read while React is rendering');
+    await act(() => {
+      ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
+    });
+    assertConsoleErrorDev([
+      'Context can only be read while React is rendering. ' +
+        'In classes, you can read it in the render method or getDerivedStateFromProps. ' +
+        'In function components, you can read it directly in the function body, ' +
+        'but not inside Hooks like useReducer() or useMemo().\n' +
+        '    in App (at **)',
+    ]);
     expect(firstRead).toBe('light');
     expect(secondRead).toBe('light');
   });
@@ -1054,11 +1073,16 @@ describe('ReactHooks', () => {
       return null;
     }
 
-    await expect(async () => {
-      await act(() => {
-        ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
-      });
-    }).toErrorDev(['Context can only be read while React is rendering']);
+    await act(() => {
+      ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
+    });
+    assertConsoleErrorDev([
+      'Context can only be read while React is rendering. ' +
+        'In classes, you can read it in the render method or getDerivedStateFromProps. ' +
+        'In function components, you can read it directly in the function body, ' +
+        'but not inside Hooks like useReducer() or useMemo().\n' +
+        '    in App (at **)',
+    ]);
   });
 
   // Edge case.
@@ -1084,19 +1108,25 @@ describe('ReactHooks', () => {
       }
     }
 
-    await expect(async () => {
-      await act(() => {
-        ReactTestRenderer.create(
-          <>
-            <Fn />
-            <Cls />
-          </>,
-          {unstable_isConcurrent: true},
-        );
-      });
-    }).toErrorDev([
-      'Context can only be read while React is rendering',
-      'Cannot update a component (`Fn`) while rendering a different component (`Cls`).',
+    await act(() => {
+      ReactTestRenderer.create(
+        <>
+          <Fn />
+          <Cls />
+        </>,
+        {unstable_isConcurrent: true},
+      );
+    });
+    assertConsoleErrorDev([
+      'Context can only be read while React is rendering. ' +
+        'In classes, you can read it in the render method or getDerivedStateFromProps. ' +
+        'In function components, you can read it directly in the function body, ' +
+        'but not inside Hooks like useReducer() or useMemo().\n' +
+        '    in Cls (at **)',
+      'Cannot update a component (`Fn`) while rendering a different component (`Cls`). ' +
+        'To locate the bad setState() call inside `Cls`, ' +
+        'follow the stack trace as described in https://react.dev/link/setstate-in-render\n' +
+        '    in Cls (at **)',
     ]);
   });
 
@@ -1116,24 +1146,32 @@ describe('ReactHooks', () => {
     }
 
     await expect(async () => {
-      await expect(async () => {
-        await act(() => {
-          ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
-        });
-      }).rejects.toThrow(
-        'Update hook called on initial render. This is likely a bug in React. Please file an issue.',
-      );
-    }).toErrorDev([
-      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks',
-      'Warning: React has detected a change in the order of Hooks called by App. ' +
+      await act(() => {
+        ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
+      });
+    }).rejects.toThrow(
+      'Update hook called on initial render. This is likely a bug in React. Please file an issue.',
+    );
+    assertConsoleErrorDev([
+      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks. ' +
+        'You can only call Hooks at the top level of your React function. ' +
+        'For more information, see https://react.dev/link/rules-of-hooks\n' +
+        '    in App (at **)',
+      'React has detected a change in the order of Hooks called by App. ' +
         'This will lead to bugs and errors if not fixed. For more information, ' +
-        'read the Rules of Hooks: https://react.dev/link/rules-of-hooks\n\n' +
+        'read the Rules of Hooks: https://react.dev/link/rules-of-hooks\n' +
+        '\n' +
         '   Previous render            Next render\n' +
         '   ------------------------------------------------------\n' +
         '1. useReducer                 useReducer\n' +
         '2. useState                   useRef\n' +
-        '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n',
-      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks',
+        '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n' +
+        '\n' +
+        '    in App (at **)',
+      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks. ' +
+        'You can only call Hooks at the top level of your React function. ' +
+        'For more information, see https://react.dev/link/rules-of-hooks\n' +
+        '    in App (at **)',
     ]);
   });
 
@@ -1146,13 +1184,15 @@ describe('ReactHooks', () => {
       });
       return null;
     }
-    await expect(async () => {
-      await act(() => {
-        ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
-      });
-    }).toErrorDev(
-      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks.',
-    );
+    await act(() => {
+      ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
+    });
+    assertConsoleErrorDev([
+      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks. ' +
+        'You can only call Hooks at the top level of your React function. ' +
+        'For more information, see https://react.dev/link/rules-of-hooks\n' +
+        '    in App (at **)',
+    ]);
   });
 
   it('resets warning internal state when interrupted by an error', async () => {
@@ -1183,21 +1223,37 @@ describe('ReactHooks', () => {
       }
     }
 
-    await expect(async () => {
-      await act(() => {
-        ReactTestRenderer.create(
-          <Boundary>
-            <App />
-          </Boundary>,
-          {unstable_isConcurrent: true},
-        );
-      });
-    }).toErrorDev([
-      'Context can only be read while React is rendering',
-      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks',
-
-      'Context can only be read while React is rendering',
-      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks',
+    await act(() => {
+      ReactTestRenderer.create(
+        <Boundary>
+          <App />
+        </Boundary>,
+        {unstable_isConcurrent: true},
+      );
+    });
+    assertConsoleErrorDev([
+      'Context can only be read while React is rendering. ' +
+        'In classes, you can read it in the render method or getDerivedStateFromProps. ' +
+        'In function components, you can read it directly in the function body, ' +
+        'but not inside Hooks like useReducer() or useMemo().\n' +
+        '    in App (at **)' +
+        (gate('enableOwnerStacks') ? '' : '\n    in Boundary (at **)'),
+      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks. ' +
+        'You can only call Hooks at the top level of your React function. ' +
+        'For more information, see https://react.dev/link/rules-of-hooks\n' +
+        '    in App (at **)' +
+        (gate('enableOwnerStacks') ? '' : '\n    in Boundary (at **)'),
+      'Context can only be read while React is rendering. ' +
+        'In classes, you can read it in the render method or getDerivedStateFromProps. ' +
+        'In function components, you can read it directly in the function body, ' +
+        'but not inside Hooks like useReducer() or useMemo().\n' +
+        '    in App (at **)' +
+        (gate('enableOwnerStacks') ? '' : '\n    in Boundary (at **)'),
+      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks. ' +
+        'You can only call Hooks at the top level of your React function. ' +
+        'For more information, see https://react.dev/link/rules-of-hooks\n' +
+        '    in App (at **)' +
+        (gate('enableOwnerStacks') ? '' : '\n    in Boundary (at **)'),
     ]);
 
     function Valid() {
@@ -1224,46 +1280,41 @@ describe('ReactHooks', () => {
     });
 
     // Verify warnings don't get permanently disabled.
-    await expect(async () => {
-      await act(() => {
-        ReactTestRenderer.create(
-          <Boundary>
-            <App />
-          </Boundary>,
-          {unstable_isConcurrent: true},
-        );
-      });
-    }).toErrorDev([
-      'Context can only be read while React is rendering',
-      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks',
-
-      'Context can only be read while React is rendering',
-      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks',
+    await act(() => {
+      ReactTestRenderer.create(
+        <Boundary>
+          <App />
+        </Boundary>,
+        {unstable_isConcurrent: true},
+      );
+    });
+    assertConsoleErrorDev([
+      'Context can only be read while React is rendering. ' +
+        'In classes, you can read it in the render method or getDerivedStateFromProps. ' +
+        'In function components, you can read it directly in the function body, ' +
+        'but not inside Hooks like useReducer() or useMemo().\n' +
+        '    in App (at **)' +
+        (gate('enableOwnerStacks') ? '' : '\n    in Boundary (at **)'),
+      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks. ' +
+        'You can only call Hooks at the top level of your React function. ' +
+        'For more information, see https://react.dev/link/rules-of-hooks\n' +
+        '    in App (at **)' +
+        (gate('enableOwnerStacks') ? '' : '\n    in Boundary (at **)'),
+      'Context can only be read while React is rendering. ' +
+        'In classes, you can read it in the render method or getDerivedStateFromProps. ' +
+        'In function components, you can read it directly in the function body, ' +
+        'but not inside Hooks like useReducer() or useMemo().\n' +
+        '    in App (at **)' +
+        (gate('enableOwnerStacks') ? '' : '\n    in Boundary (at **)'),
+      'Do not call Hooks inside useEffect(...), useMemo(...), or other built-in Hooks. ' +
+        'You can only call Hooks at the top level of your React function. ' +
+        'For more information, see https://react.dev/link/rules-of-hooks\n' +
+        '    in App (at **)' +
+        (gate('enableOwnerStacks') ? '' : '\n    in Boundary (at **)'),
     ]);
   });
 
-  it('warns when reading context inside useMemo', async () => {
-    const {useMemo, createContext} = React;
-    const ReactSharedInternals =
-      React.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
-
-    const ThemeContext = createContext('light');
-    function App() {
-      return useMemo(() => {
-        return ReactSharedInternals.H.readContext(ThemeContext);
-      }, []);
-    }
-
-    await expect(async () => {
-      await act(() => {
-        ReactTestRenderer.create(<App />, {unstable_isConcurrent: true});
-      });
-    }).toErrorDev('Context can only be read while React is rendering');
-  });
-
   it('double-invokes components with Hooks in Strict Mode', async () => {
-    ReactFeatureFlags.debugRenderPhaseSideEffectsForStrictMode = true;
-
     const {useState, StrictMode} = React;
     let renderCount = 0;
 
@@ -1481,7 +1532,6 @@ describe('ReactHooks', () => {
   });
 
   it('double-invokes useMemo in DEV StrictMode despite []', async () => {
-    ReactFeatureFlags.debugRenderPhaseSideEffectsForStrictMode = true;
     const {useMemo, StrictMode} = React;
 
     let useMemoCount = 0;
@@ -1580,7 +1630,6 @@ describe('ReactHooks', () => {
 
       it(`warns on using differently ordered hooks (${hookNameA}, ${hookNameB}) on subsequent renders`, async () => {
         function App(props) {
-          /* eslint-disable no-unused-vars */
           if (props.update) {
             secondHelper();
             firstHelper();
@@ -1591,7 +1640,6 @@ describe('ReactHooks', () => {
           // This should not appear in the warning message because it occurs after the first mismatch
           useRefHelper();
           return null;
-          /* eslint-enable no-unused-vars */
         }
         let root;
         await act(() => {
@@ -1599,24 +1647,25 @@ describe('ReactHooks', () => {
             unstable_isConcurrent: true,
           });
         });
-        await expect(async () => {
-          try {
-            await act(() => {
-              root.update(<App update={true} />);
-            });
-          } catch (error) {
-            // Swapping certain types of hooks will cause runtime errors.
-            // This is okay as far as this test is concerned.
-            // We just want to verify that warnings are always logged.
-          }
-        }).toErrorDev([
-          'Warning: React has detected a change in the order of Hooks called by App. ' +
+        try {
+          await act(() => {
+            root.update(<App update={true} />);
+          });
+        } catch (error) {
+          // Swapping certain types of hooks will cause runtime errors.
+          // This is okay as far as this test is concerned.
+          // We just want to verify that warnings are always logged.
+        }
+        assertConsoleErrorDev([
+          'React has detected a change in the order of Hooks called by App. ' +
             'This will lead to bugs and errors if not fixed. For more information, ' +
-            'read the Rules of Hooks: https://react.dev/link/rules-of-hooks\n\n' +
+            'read the Rules of Hooks: https://react.dev/link/rules-of-hooks\n' +
+            '\n' +
             '   Previous render            Next render\n' +
             '   ------------------------------------------------------\n' +
             `1. ${formatHookNamesToMatchErrorMessage(hookNameA, hookNameB)}\n` +
-            '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n' +
+            '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n' +
+            '\n' +
             '    in App (at **)',
         ]);
 
@@ -1634,7 +1683,6 @@ describe('ReactHooks', () => {
 
       it(`warns when more hooks (${hookNameA}, ${hookNameB}) are used during update than mount`, async () => {
         function App(props) {
-          /* eslint-disable no-unused-vars */
           if (props.update) {
             firstHelper();
             secondHelper();
@@ -1642,7 +1690,6 @@ describe('ReactHooks', () => {
             firstHelper();
           }
           return null;
-          /* eslint-enable no-unused-vars */
         }
         let root;
         await act(() => {
@@ -1651,25 +1698,26 @@ describe('ReactHooks', () => {
           });
         });
 
-        await expect(async () => {
-          try {
-            await act(() => {
-              root.update(<App update={true} />);
-            });
-          } catch (error) {
-            // Swapping certain types of hooks will cause runtime errors.
-            // This is okay as far as this test is concerned.
-            // We just want to verify that warnings are always logged.
-          }
-        }).toErrorDev([
-          'Warning: React has detected a change in the order of Hooks called by App. ' +
+        try {
+          await act(() => {
+            root.update(<App update={true} />);
+          });
+        } catch (error) {
+          // Swapping certain types of hooks will cause runtime errors.
+          // This is okay as far as this test is concerned.
+          // We just want to verify that warnings are always logged.
+        }
+        assertConsoleErrorDev([
+          'React has detected a change in the order of Hooks called by App. ' +
             'This will lead to bugs and errors if not fixed. For more information, ' +
-            'read the Rules of Hooks: https://react.dev/link/rules-of-hooks\n\n' +
+            'read the Rules of Hooks: https://react.dev/link/rules-of-hooks\n' +
+            '\n' +
             '   Previous render            Next render\n' +
             '   ------------------------------------------------------\n' +
             `1. ${formatHookNamesToMatchErrorMessage(hookNameA, hookNameA)}\n` +
             `2. undefined                  use${hookNameB}\n` +
-            '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n' +
+            '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n' +
+            '\n' +
             '    in App (at **)',
         ]);
       });
@@ -1690,7 +1738,6 @@ describe('ReactHooks', () => {
 
       it(`warns when fewer hooks (${hookNameA}, ${hookNameB}) are used during update than mount`, async () => {
         function App(props) {
-          /* eslint-disable no-unused-vars */
           if (props.update) {
             firstHelper();
           } else {
@@ -1698,7 +1745,6 @@ describe('ReactHooks', () => {
             secondHelper();
           }
           return null;
-          /* eslint-enable no-unused-vars */
         }
         let root;
         await act(() => {
@@ -1720,7 +1766,6 @@ describe('ReactHooks', () => {
         '(useImperativeHandleHelper, useMemoHelper) on subsequent renders',
       async () => {
         function App(props) {
-          /* eslint-disable no-unused-vars */
           if (props.update) {
             useMemoHelper();
             useImperativeHandleHelper();
@@ -1731,7 +1776,6 @@ describe('ReactHooks', () => {
           // This should not appear in the warning message because it occurs after the first mismatch
           useRefHelper();
           return null;
-          /* eslint-enable no-unused-vars */
         }
         let root;
         await act(() => {
@@ -1739,24 +1783,25 @@ describe('ReactHooks', () => {
             unstable_isConcurrent: true,
           });
         });
-        await expect(async () => {
-          await act(() => {
-            root.update(<App update={true} />);
-          }).catch(e => {});
-          // Swapping certain types of hooks will cause runtime errors.
-          // This is okay as far as this test is concerned.
-          // We just want to verify that warnings are always logged.
-        }).toErrorDev([
-          'Warning: React has detected a change in the order of Hooks called by App. ' +
+        await act(() => {
+          root.update(<App update={true} />);
+        }).catch(e => {});
+        // Swapping certain types of hooks will cause runtime errors.
+        // This is okay as far as this test is concerned.
+        // We just want to verify that warnings are always logged.
+        assertConsoleErrorDev([
+          'React has detected a change in the order of Hooks called by App. ' +
             'This will lead to bugs and errors if not fixed. For more information, ' +
-            'read the Rules of Hooks: https://react.dev/link/rules-of-hooks\n\n' +
+            'read the Rules of Hooks: https://react.dev/link/rules-of-hooks\n' +
+            '\n' +
             '   Previous render            Next render\n' +
             '   ------------------------------------------------------\n' +
             `1. ${formatHookNamesToMatchErrorMessage(
               'ImperativeHandle',
               'Memo',
             )}\n` +
-            '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n' +
+            '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n' +
+            '\n' +
             '    in App (at **)',
         ]);
 
@@ -1773,7 +1818,6 @@ describe('ReactHooks', () => {
         useState(0);
       }
       function App(props) {
-        /* eslint-disable no-unused-vars */
         if (props.update) {
           useCustomHook();
           useReducer((s, a) => a, 0);
@@ -1783,7 +1827,6 @@ describe('ReactHooks', () => {
           useCustomHook();
         }
         return null;
-        /* eslint-enable no-unused-vars */
       }
       let root;
       await act(() => {
@@ -1792,19 +1835,21 @@ describe('ReactHooks', () => {
         });
       });
       await expect(async () => {
-        await expect(async () => {
-          await act(() => {
-            root.update(<App update={true} />);
-          });
-        }).rejects.toThrow('custom error');
-      }).toErrorDev([
-        'Warning: React has detected a change in the order of Hooks called by App. ' +
+        await act(() => {
+          root.update(<App update={true} />);
+        });
+      }).rejects.toThrow('custom error');
+      assertConsoleErrorDev([
+        'React has detected a change in the order of Hooks called by App. ' +
           'This will lead to bugs and errors if not fixed. For more information, ' +
-          'read the Rules of Hooks: https://react.dev/link/rules-of-hooks\n\n' +
+          'read the Rules of Hooks: https://react.dev/link/rules-of-hooks\n' +
+          '\n' +
           '   Previous render            Next render\n' +
           '   ------------------------------------------------------\n' +
           '1. useReducer                 useState\n' +
-          '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n',
+          '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n' +
+          '\n' +
+          '    in App (at **)',
       ]);
     });
   });
@@ -1839,8 +1884,10 @@ describe('ReactHooks', () => {
       });
     }).rejects.toThrow('Hello');
     assertConsoleErrorDev([
-      'Warning: Cannot update a component (`A`) while rendering ' +
-        'a different component (`B`).',
+      'Cannot update a component (`A`) while rendering a different component (`B`). ' +
+        'To locate the bad setState() call inside `B`, ' +
+        'follow the stack trace as described in https://react.dev/link/setstate-in-render\n' +
+        '    in B (at **)',
     ]);
   });
 
@@ -1899,13 +1946,15 @@ describe('ReactHooks', () => {
   it('does not fire a false positive warning when suspending memo', async () => {
     const {Suspense, useState} = React;
 
-    let wasSuspended = false;
+    let isSuspended = true;
     let resolve;
     function trySuspend() {
-      if (!wasSuspended) {
-        throw new Promise(r => {
-          wasSuspended = true;
-          resolve = r;
+      if (isSuspended) {
+        throw new Promise(res => {
+          resolve = () => {
+            isSuspended = false;
+            res();
+          };
         });
       }
     }
@@ -1935,13 +1984,15 @@ describe('ReactHooks', () => {
   it('does not fire a false positive warning when suspending forwardRef', async () => {
     const {Suspense, useState} = React;
 
-    let wasSuspended = false;
+    let isSuspended = true;
     let resolve;
     function trySuspend() {
-      if (!wasSuspended) {
-        throw new Promise(r => {
-          wasSuspended = true;
-          resolve = r;
+      if (isSuspended) {
+        throw new Promise(res => {
+          resolve = () => {
+            isSuspended = false;
+            res();
+          };
         });
       }
     }
@@ -1971,13 +2022,15 @@ describe('ReactHooks', () => {
   it('does not fire a false positive warning when suspending memo(forwardRef)', async () => {
     const {Suspense, useState} = React;
 
-    let wasSuspended = false;
+    let isSuspended = true;
     let resolve;
     function trySuspend() {
-      if (!wasSuspended) {
-        throw new Promise(r => {
-          wasSuspended = true;
-          resolve = r;
+      if (isSuspended) {
+        throw new Promise(res => {
+          resolve = () => {
+            isSuspended = false;
+            res();
+          };
         });
       }
     }

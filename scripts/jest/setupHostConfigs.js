@@ -12,6 +12,8 @@ function resolveEntryFork(resolvedEntry, isFBBundle) {
   // .stable.js
   // .experimental.js
   // .js
+  // or any of those plus .development.js
+
   if (isFBBundle) {
     // FB builds for react-dom need to alias both react-dom and react-dom/client to the same
     // entrypoint since there is only a single build for them.
@@ -41,6 +43,10 @@ function resolveEntryFork(resolvedEntry, isFBBundle) {
       }
 
       resolvedEntry = nodePath.join(resolvedEntry, '..', entrypoint);
+      const devEntry = resolvedEntry.replace('.js', '.development.js');
+      if (__DEV__ && fs.existsSync(devEntry)) {
+        return devEntry;
+      }
       if (fs.existsSync(resolvedEntry)) {
         return resolvedEntry;
       }
@@ -53,10 +59,21 @@ function resolveEntryFork(resolvedEntry, isFBBundle) {
       '.js',
       __EXPERIMENTAL__ ? '.modern.fb.js' : '.classic.fb.js'
     );
+    const devFBEntry = resolvedFBEntry.replace('.js', '.development.js');
+    if (__DEV__ && fs.existsSync(devFBEntry)) {
+      return devFBEntry;
+    }
     if (fs.existsSync(resolvedFBEntry)) {
       return resolvedFBEntry;
     }
     const resolvedGenericFBEntry = resolvedEntry.replace('.js', '.fb.js');
+    const devGenericFBEntry = resolvedGenericFBEntry.replace(
+      '.js',
+      '.development.js'
+    );
+    if (__DEV__ && fs.existsSync(devGenericFBEntry)) {
+      return devGenericFBEntry;
+    }
     if (fs.existsSync(resolvedGenericFBEntry)) {
       return resolvedGenericFBEntry;
     }
@@ -66,8 +83,16 @@ function resolveEntryFork(resolvedEntry, isFBBundle) {
     '.js',
     __EXPERIMENTAL__ ? '.experimental.js' : '.stable.js'
   );
+  const devForkedEntry = resolvedForkedEntry.replace('.js', '.development.js');
+  if (__DEV__ && fs.existsSync(devForkedEntry)) {
+    return devForkedEntry;
+  }
   if (fs.existsSync(resolvedForkedEntry)) {
     return resolvedForkedEntry;
+  }
+  const plainDevEntry = resolvedEntry.replace('.js', '.development.js');
+  if (__DEV__ && fs.existsSync(plainDevEntry)) {
+    return plainDevEntry;
   }
   // Just use the plain .js one.
   return resolvedEntry;
@@ -77,7 +102,8 @@ function mockReact() {
   jest.mock('react', () => {
     const resolvedEntryPoint = resolveEntryFork(
       require.resolve('react'),
-      global.__WWW__
+      global.__WWW__ || global.__XPLAT__,
+      global.__DEV__
     );
     return jest.requireActual(resolvedEntryPoint);
   });
@@ -100,7 +126,8 @@ jest.mock('react/react.react-server', () => {
   });
   const resolvedEntryPoint = resolveEntryFork(
     require.resolve('react/src/ReactServer'),
-    global.__WWW__
+    global.__WWW__ || global.__XPLAT__,
+    global.__DEV__
   );
   return jest.requireActual(resolvedEntryPoint);
 });
@@ -198,7 +225,8 @@ inlinedHostConfigs.forEach(rendererInfo => {
       mockAllConfigs(rendererInfo);
       const resolvedEntryPoint = resolveEntryFork(
         require.resolve(entryPoint),
-        global.__WWW__
+        global.__WWW__ || global.__XPLAT__,
+        global.__DEV__
       );
       return jest.requireActual(resolvedEntryPoint);
     });

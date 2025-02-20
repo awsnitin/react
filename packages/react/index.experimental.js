@@ -9,7 +9,7 @@
 
 export {
   __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE,
-  act,
+  __COMPILER_RUNTIME,
   Children,
   Component,
   Fragment,
@@ -28,11 +28,13 @@ export {
   memo,
   cache,
   startTransition,
-  unstable_DebugTracingMode,
   unstable_Activity,
   unstable_postpone,
   unstable_getCacheForType,
   unstable_SuspenseList,
+  unstable_ViewTransition,
+  unstable_useSwipeTransition,
+  unstable_addTransitionType,
   unstable_useCacheRefresh,
   useId,
   useCallback,

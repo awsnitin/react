@@ -41,6 +41,7 @@ describe('ReactDOMServerIntegration - Untrusted URLs', () => {
   const {
     resetModules,
     itRenders,
+    clientCleanRender,
     clientRenderOnBadMarkup,
     clientRenderOnServerString,
   } = ReactDOMServerIntegrationUtils(initModules);
@@ -67,6 +68,25 @@ describe('ReactDOMServerIntegration - Untrusted URLs', () => {
     );
     expect(e.firstChild.href).toBe(EXPECTED_SAFE_URL);
     expect(e.lastChild.href).toBe(EXPECTED_SAFE_URL);
+  });
+
+  itRenders('sanitizes on various tags', async render => {
+    const aElement = await render(<a href="javascript:notfine" />);
+    expect(aElement.href).toBe(EXPECTED_SAFE_URL);
+
+    const objectElement = await render(<object data="javascript:notfine" />);
+    expect(objectElement.data).toBe(EXPECTED_SAFE_URL);
+
+    const embedElement = await render(<embed src="javascript:notfine" />);
+    expect(embedElement.src).toBe(EXPECTED_SAFE_URL);
+  });
+
+  itRenders('passes through data on non-object tags', async render => {
+    const div = await render(<div data="test" />);
+    expect(div.getAttribute('data')).toBe('test');
+
+    const a = await render(<a data="javascript:fine" />);
+    expect(a.getAttribute('data')).toBe('javascript:fine');
   });
 
   itRenders('a javascript protocol with leading spaces', async render => {
@@ -122,6 +142,11 @@ describe('ReactDOMServerIntegration - Untrusted URLs', () => {
   });
 
   itRenders('a javascript protocol frame src', async render => {
+    if (render === clientCleanRender || render === clientRenderOnServerString) {
+      // React does not hydrate framesets properly because the default hydration scope
+      // is the body
+      return;
+    }
     const e = await render(
       <html>
         <head />

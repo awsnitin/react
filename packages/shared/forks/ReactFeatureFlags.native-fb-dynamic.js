@@ -18,13 +18,13 @@
 // add a test configuration for React Native.
 
 export const alwaysThrottleRetries = __VARIANT__;
-export const consoleManagedByDevToolsDuringStrictMode = __VARIANT__;
-export const disableDefaultPropsExceptForClasses = __VARIANT__;
-export const disableStringRefs = __VARIANT__;
-export const enableAddPropertiesFastPath = __VARIANT__;
-export const enableDeferRootSchedulingToMicrotask = __VARIANT__;
-export const enableFastJSX = __VARIANT__;
-export const enableInfiniteRenderLoopDetection = __VARIANT__;
-export const enableRefAsProp = __VARIANT__;
-export const enableUnifiedSyncLane = __VARIANT__;
+export const enableObjectFiber = __VARIANT__;
+export const enableHiddenSubtreeInsertionEffectCleanup = __VARIANT__;
+export const enablePersistedModeClonedFlag = __VARIANT__;
+export const enableShallowPropDiffing = __VARIANT__;
 export const passChildrenWhenCloningPersistedNodes = __VARIANT__;
+export const enableFabricCompleteRootInCommitPhase = __VARIANT__;
+export const enableSiblingPrerendering = __VARIANT__;
+export const enableUseEffectCRUDOverload = __VARIANT__;
+export const enableFastAddPropertiesInDiffing = __VARIANT__;
+export const enableLazyPublicInstanceInFabric = __VARIANT__;

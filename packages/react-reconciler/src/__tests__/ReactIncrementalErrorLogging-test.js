@@ -33,7 +33,7 @@ describe('ReactIncrementalErrorLogging', () => {
     waitForAll = InternalTestUtils.waitForAll;
   });
 
-  // Note: in this test file we won't be using toErrorDev() matchers
+  // Note: in this test file we won't be using assertConsoleDev() matchers
   // because they filter out precisely the messages we want to test for.
   let oldConsoleWarn;
   let oldConsoleError;
@@ -85,19 +85,22 @@ describe('ReactIncrementalErrorLogging', () => {
       expect(console.warn).toHaveBeenCalledWith(
         expect.stringContaining('%s'),
         expect.stringContaining(
-          'An error occurred in the <ErrorThrowingComponent> component:',
-        ),
-        expect.stringMatching(
-          new RegExp(
-            '\\s+(in|at) ErrorThrowingComponent (.*)\n' +
-              '\\s+(in|at) span(.*)\n' +
-              '\\s+(in|at) div(.*)',
-          ),
+          'An error occurred in the <ErrorThrowingComponent> component.',
         ),
         expect.stringContaining(
           'Consider adding an error boundary to your tree ' +
             'to customize error handling behavior.',
         ),
+        // The component stack is not added without the polyfill/devtools.
+        // expect.stringMatching(
+        //  new RegExp(
+        //    gate(flags => flags.enableOwnerStacks)
+        //      ? '\\s+(in|at) ErrorThrowingComponent'
+        //      : '\\s+(in|at) ErrorThrowingComponent (.*)\n' +
+        //        '\\s+(in|at) span(.*)\n' +
+        //        '\\s+(in|at) div(.*)',
+        //  ),
+        // ),
       );
     }
   });
@@ -131,19 +134,22 @@ describe('ReactIncrementalErrorLogging', () => {
       expect(console.warn).toHaveBeenCalledWith(
         expect.stringContaining('%s'),
         expect.stringContaining(
-          'An error occurred in the <ErrorThrowingComponent> component:',
-        ),
-        expect.stringMatching(
-          new RegExp(
-            '\\s+(in|at) ErrorThrowingComponent (.*)\n' +
-              '\\s+(in|at) span(.*)\n' +
-              '\\s+(in|at) div(.*)',
-          ),
+          'An error occurred in the <ErrorThrowingComponent> component.',
         ),
         expect.stringContaining(
           'Consider adding an error boundary to your tree ' +
             'to customize error handling behavior.',
         ),
+        // The component stack is not added without the polyfill/devtools.
+        // expect.stringMatching(
+        //   new RegExp(
+        //     gate(flags => flags.enableOwnerStacks)
+        //       ? '\\s+(in|at) ErrorThrowingComponent'
+        //       : '\\s+(in|at) ErrorThrowingComponent (.*)\n' +
+        //         '\\s+(in|at) span(.*)\n' +
+        //         '\\s+(in|at) div(.*)',
+        //   ),
+        // ),
       );
     }
   });
@@ -189,20 +195,23 @@ describe('ReactIncrementalErrorLogging', () => {
           message: 'render error',
         }),
         expect.stringContaining(
-          'The above error occurred in the <ErrorThrowingComponent> component:',
-        ),
-        expect.stringMatching(
-          new RegExp(
-            '\\s+(in|at) ErrorThrowingComponent (.*)\n' +
-              '\\s+(in|at) span(.*)\n' +
-              '\\s+(in|at) ErrorBoundary(.*)\n' +
-              '\\s+(in|at) div(.*)',
-          ),
+          'The above error occurred in the <ErrorThrowingComponent> component.',
         ),
         expect.stringContaining(
           'React will try to recreate this component tree from scratch ' +
             'using the error boundary you provided, ErrorBoundary.',
         ),
+        // The component stack is not added without the polyfill/devtools.
+        // expect.stringMatching(
+        //   new RegExp(
+        //     gate(flags => flags.enableOwnerStacks)
+        //       ? '\\s+(in|at) ErrorThrowingComponent'
+        //       : '\\s+(in|at) ErrorThrowingComponent (.*)\n' +
+        //         '\\s+(in|at) span(.*)\n' +
+        //         '\\s+(in|at) ErrorBoundary(.*)\n' +
+        //         '\\s+(in|at) div(.*)',
+        //   ),
+        // ),
       );
     } else {
       expect(logCapturedErrorCalls[0]).toEqual(
@@ -270,17 +279,20 @@ describe('ReactIncrementalErrorLogging', () => {
           message: 'oops',
         }),
         expect.stringContaining(
-          'The above error occurred in the <Foo> component:',
-        ),
-        expect.stringMatching(
-          new RegExp(
-            '\\s+(in|at) Foo (.*)\n' + '\\s+(in|at) ErrorBoundary(.*)',
-          ),
+          'The above error occurred in the <Foo> component.',
         ),
         expect.stringContaining(
           'React will try to recreate this component tree from scratch ' +
             'using the error boundary you provided, ErrorBoundary.',
         ),
+        // The component stack is not added without the polyfill/devtools.
+        // expect.stringMatching(
+        //   gate(flag => flag.enableOwnerStacks)
+        //     ? new RegExp('\\s+(in|at) Foo')
+        //     : new RegExp(
+        //         '\\s+(in|at) Foo (.*)\n' + '\\s+(in|at) ErrorBoundary(.*)',
+        //       ),
+        // ),
       );
     } else {
       expect(console.error).toHaveBeenCalledWith(

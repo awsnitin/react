@@ -14,6 +14,7 @@ import {
   disableLegacyMode,
   enableLegacyHidden,
   enableRenderableContext,
+  enableViewTransition,
 } from 'shared/ReactFeatureFlags';
 
 import {
@@ -44,6 +45,8 @@ import {
   LegacyHiddenComponent,
   CacheComponent,
   TracingMarkerComponent,
+  Throw,
+  ViewTransitionComponent,
 } from 'react-reconciler/src/ReactWorkTags';
 import getComponentNameFromType from 'shared/getComponentNameFromType';
 import {REACT_STRICT_MODE_TYPE} from 'shared/ReactSymbols';
@@ -138,7 +141,12 @@ export default function getComponentNameFromFiber(fiber: Fiber): string | null {
       return 'SuspenseList';
     case TracingMarkerComponent:
       return 'TracingMarker';
+    case ViewTransitionComponent:
+      if (enableViewTransition) {
+        return 'ViewTransition';
+      }
     // The display name for these tags come from the user-provided type:
+    // Fallthrough
     case IncompleteClassComponent:
     case IncompleteFunctionComponent:
       if (disableLegacyMode) {
@@ -160,6 +168,26 @@ export default function getComponentNameFromFiber(fiber: Fiber): string | null {
       if (enableLegacyHidden) {
         return 'LegacyHidden';
       }
+      break;
+    case Throw: {
+      if (__DEV__) {
+        // For an error in child position we use the name of the inner most parent component.
+        // Whether a Server Component or the parent Fiber.
+        const debugInfo = fiber._debugInfo;
+        if (debugInfo != null) {
+          for (let i = debugInfo.length - 1; i >= 0; i--) {
+            if (typeof debugInfo[i].name === 'string') {
+              return debugInfo[i].name;
+            }
+          }
+        }
+        if (fiber.return === null) {
+          return null;
+        }
+        return getComponentNameFromFiber(fiber.return);
+      }
+      return null;
+    }
   }
 
   return null;

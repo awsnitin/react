@@ -14,6 +14,7 @@ import type {
   Usable,
   Thenable,
   ReactDebugInfo,
+  StartGesture,
 } from 'shared/ReactTypes';
 import type {
   ContextDependency,
@@ -96,21 +97,13 @@ function getPrimitiveStackCache(): Map<string, Array<any>> {
       );
       Dispatcher.useDeferredValue(null);
       Dispatcher.useMemo(() => null);
+      Dispatcher.useOptimistic(null, (s: mixed, a: mixed) => s);
+      Dispatcher.useFormState((s: mixed, p: mixed) => s, null);
+      Dispatcher.useActionState((s: mixed, p: mixed) => s, null);
+      Dispatcher.useHostTransitionStatus();
       if (typeof Dispatcher.useMemoCache === 'function') {
         // This type check is for Flow only.
         Dispatcher.useMemoCache(0);
-      }
-      if (typeof Dispatcher.useOptimistic === 'function') {
-        // This type check is for Flow only.
-        Dispatcher.useOptimistic(null, (s: mixed, a: mixed) => s);
-      }
-      if (typeof Dispatcher.useFormState === 'function') {
-        // This type check is for Flow only.
-        Dispatcher.useFormState((s: mixed, p: mixed) => s, null);
-      }
-      if (typeof Dispatcher.useActionState === 'function') {
-        // This type check is for Flow only.
-        Dispatcher.useActionState((s: mixed, p: mixed) => s, null);
       }
       if (typeof Dispatcher.use === 'function') {
         // This type check is for Flow only.
@@ -136,9 +129,11 @@ function getPrimitiveStackCache(): Map<string, Array<any>> {
 
       Dispatcher.useId();
 
-      if (typeof Dispatcher.useHostTransitionStatus === 'function') {
-        // This type check is for Flow only.
-        Dispatcher.useHostTransitionStatus();
+      if (typeof Dispatcher.useEffectEvent === 'function') {
+        Dispatcher.useEffectEvent((args: empty) => {});
+      }
+      if (typeof Dispatcher.useSwipeTransition === 'function') {
+        Dispatcher.useSwipeTransition(null, null, null);
       }
     } finally {
       readHookLog = hookLog;
@@ -203,7 +198,7 @@ const SuspenseException: mixed = new Error(
     '`try/catch` block. Capturing without rethrowing will lead to ' +
     'unexpected behavior.\n\n' +
     'To handle async errors, wrap your component in an error boundary, or ' +
-    "call the promise's `.catch` method and pass the result to `use`",
+    "call the promise's `.catch` method and pass the result to `use`.",
 );
 
 function use<T>(usable: Usable<T>): T {
@@ -284,9 +279,9 @@ function useState<S>(
     hook !== null
       ? hook.memoizedState
       : typeof initialState === 'function'
-      ? // $FlowFixMe[incompatible-use]: Flow doesn't like mixed types
-        initialState()
-      : initialState;
+        ? // $FlowFixMe[incompatible-use]: Flow doesn't like mixed types
+          initialState()
+        : initialState;
   hookLog.push({
     displayName: null,
     primitive: 'State',
@@ -379,8 +374,11 @@ function useInsertionEffect(
 }
 
 function useEffect(
-  create: () => (() => void) | void,
-  inputs: Array<mixed> | void | null,
+  create: (() => (() => void) | void) | (() => {...} | void | null),
+  createDeps: Array<mixed> | void | null,
+  update?: ((resource: {...} | void | null) => void) | void,
+  updateDeps?: Array<mixed> | void | null,
+  destroy?: ((resource: {...} | void | null) => void) | void,
 ): void {
   nextHook();
   hookLog.push({
@@ -533,15 +531,16 @@ function useId(): string {
 
 // useMemoCache is an implementation detail of Forget's memoization
 // it should not be called directly in user-generated code
-function useMemoCache(size: number): Array<any> {
+function useMemoCache(size: number): Array<mixed> {
   const fiber = currentFiber;
   // Don't throw, in case this is called from getPrimitiveStackCache
   if (fiber == null) {
     return [];
   }
 
-  // $FlowFixMe[incompatible-use]: updateQueue is mixed
-  const memoCache = fiber.updateQueue?.memoCache;
+  const memoCache =
+    // $FlowFixMe[incompatible-use]: updateQueue is mixed
+    fiber.updateQueue != null ? fiber.updateQueue.memoCache : null;
   if (memoCache == null) {
     return [];
   }
@@ -743,30 +742,64 @@ function useHostTransitionStatus(): TransitionStatus {
   return status;
 }
 
+function useEffectEvent<Args, F: (...Array<Args>) => mixed>(callback: F): F {
+  nextHook();
+  hookLog.push({
+    displayName: null,
+    primitive: 'EffectEvent',
+    stackError: new Error(),
+    value: callback,
+    debugInfo: null,
+    dispatcherHookName: 'EffectEvent',
+  });
+
+  return callback;
+}
+
+function useSwipeTransition<T>(
+  previous: T,
+  current: T,
+  next: T,
+): [T, StartGesture] {
+  nextHook();
+  hookLog.push({
+    displayName: null,
+    primitive: 'SwipeTransition',
+    stackError: new Error(),
+    value: current,
+    debugInfo: null,
+    dispatcherHookName: 'SwipeTransition',
+  });
+  return [current, () => () => {}];
+}
+
 const Dispatcher: DispatcherType = {
-  use,
   readContext,
-  useCacheRefresh,
+
+  use,
   useCallback,
   useContext,
   useEffect,
   useImperativeHandle,
-  useDebugValue,
   useLayoutEffect,
   useInsertionEffect,
   useMemo,
-  useMemoCache,
-  useOptimistic,
   useReducer,
   useRef,
   useState,
+  useDebugValue,
+  useDeferredValue,
   useTransition,
   useSyncExternalStore,
-  useDeferredValue,
   useId,
+  useHostTransitionStatus,
   useFormState,
   useActionState,
-  useHostTransitionStatus,
+  useOptimistic,
+  useMemoCache,
+  useCacheRefresh,
+  useEffectEvent,
+  useSwipeTransition,
 };
 
 // create a proxy to throw a custom error
@@ -774,6 +807,7 @@ const Dispatcher: DispatcherType = {
 const DispatcherProxyHandler = {
   get(target: DispatcherType, prop: string) {
     if (target.hasOwnProperty(prop)) {
+      // $FlowFixMe[invalid-computed-prop]
       return target[prop];
     }
     const error = new Error('Missing method in Dispatcher: ' + prop);
@@ -868,7 +902,12 @@ function findCommonAncestorIndex(rootStack: any, hookStack: any) {
 }
 
 function isReactWrapper(functionName: any, wrapperName: string) {
-  return parseHookName(functionName) === wrapperName;
+  const hookName = parseHookName(functionName);
+  if (wrapperName === 'HostTransitionStatus') {
+    return hookName === wrapperName || hookName === 'FormStatus';
+  }
+
+  return hookName === wrapperName;
 }
 
 function findPrimitiveIndex(hookStack: any, hook: HookLogEntry) {
@@ -878,21 +917,24 @@ function findPrimitiveIndex(hookStack: any, hook: HookLogEntry) {
     return -1;
   }
   for (let i = 0; i < primitiveStack.length && i < hookStack.length; i++) {
+    // Note: there is no guarantee that we will find the top-most primitive frame in the stack
+    // For React Native (uses Hermes), these source fields will be identical and skipped
     if (primitiveStack[i].source !== hookStack[i].source) {
-      // If the next frame is a method from the dispatcher, we
-      // assume that the next frame after that is the actual public API call.
-      // This prohibits nesting dispatcher calls in hooks.
+      // If the next two frames are functions called `useX` then we assume that they're part of the
+      // wrappers that the React package or other packages adds around the dispatcher.
       if (
         i < hookStack.length - 1 &&
         isReactWrapper(hookStack[i].functionName, hook.dispatcherHookName)
       ) {
         i++;
-        // Guard against the dispatcher call being inlined.
-        // At this point we wouldn't be able to recover the actual React Hook name.
-        if (i < hookStack.length - 1) {
-          i++;
-        }
       }
+      if (
+        i < hookStack.length - 1 &&
+        isReactWrapper(hookStack[i].functionName, hook.dispatcherHookName)
+      ) {
+        i++;
+      }
+
       return i;
     }
   }
@@ -941,6 +983,15 @@ function parseHookName(functionName: void | string): string {
   } else {
     startIndex += 1;
   }
+
+  if (functionName.slice(startIndex).startsWith('unstable_')) {
+    startIndex += 'unstable_'.length;
+  }
+
+  if (functionName.slice(startIndex).startsWith('experimental_')) {
+    startIndex += 'experimental_'.length;
+  }
+
   if (functionName.slice(startIndex, startIndex + 3) === 'use') {
     if (functionName.length - startIndex === 3) {
       return 'Use';
@@ -991,6 +1042,7 @@ function buildTree(
         }
         // Pop back the stack as many steps as were not common.
         for (let j = prevStack.length - 1; j > commonSteps; j--) {
+          // $FlowFixMe[incompatible-type]
           levelChildren = stackOfChildren.pop();
         }
       }
@@ -1040,7 +1092,7 @@ function buildTree(
     const levelChild: HooksNode = {
       id,
       isStateEditable,
-      name: name,
+      name,
       value: hook.value,
       subHooks: [],
       debugInfo: debugInfo,

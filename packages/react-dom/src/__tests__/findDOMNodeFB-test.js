@@ -12,14 +12,16 @@
 const React = require('react');
 const ReactDOM = require('react-dom');
 const StrictMode = React.StrictMode;
+const assertConsoleErrorDev =
+  require('internal-test-utils').assertConsoleErrorDev;
 
 describe('findDOMNode', () => {
-  // @gate www && !disableLegacyMode
+  // @gate www && classic
   it('findDOMNode should return null if passed null', () => {
     expect(ReactDOM.findDOMNode(null)).toBe(null);
   });
 
-  // @gate www && !disableLegacyMode
+  // @gate www && classic && !disableLegacyMode
   it('findDOMNode should find dom element', () => {
     class MyNode extends React.Component {
       render() {
@@ -39,7 +41,7 @@ describe('findDOMNode', () => {
     expect(mySameDiv).toBe(myDiv);
   });
 
-  // @gate www && !disableLegacyMode
+  // @gate www && classic && !disableLegacyMode
   it('findDOMNode should find dom element after an update from null', () => {
     function Bar({flag}) {
       if (flag) {
@@ -66,14 +68,14 @@ describe('findDOMNode', () => {
     expect(b.tagName).toBe('SPAN');
   });
 
-  // @gate www && !disableLegacyMode
+  // @gate www && classic
   it('findDOMNode should reject random objects', () => {
     expect(function () {
       ReactDOM.findDOMNode({foo: 'bar'});
     }).toThrowError('Argument appears to not be a ReactComponent. Keys: foo');
   });
 
-  // @gate www && !disableLegacyMode
+  // @gate www && classic && !disableLegacyMode
   it('findDOMNode should reject unmounted objects with render func', () => {
     class Foo extends React.Component {
       render() {
@@ -90,7 +92,7 @@ describe('findDOMNode', () => {
     );
   });
 
-  // @gate www && !disableLegacyMode
+  // @gate www && classic && !disableLegacyMode
   it('findDOMNode should not throw an error when called within a component that is not mounted', () => {
     class Bar extends React.Component {
       UNSAFE_componentWillMount() {
@@ -107,7 +109,7 @@ describe('findDOMNode', () => {
     }).not.toThrow();
   });
 
-  // @gate www && !disableLegacyMode
+  // @gate www && classic && !disableLegacyMode
   it('findDOMNode should warn if used to find a host component inside StrictMode', () => {
     let parent = undefined;
     let child = undefined;
@@ -128,9 +130,9 @@ describe('findDOMNode', () => {
       container,
     );
 
-    let match;
-    expect(() => (match = ReactDOM.findDOMNode(parent))).toErrorDev([
-      'Warning: findDOMNode is deprecated in StrictMode. ' +
+    const match = ReactDOM.findDOMNode(parent);
+    assertConsoleErrorDev([
+      'findDOMNode is deprecated in StrictMode. ' +
         'findDOMNode was passed an instance of ContainsStrictModeChild which renders StrictMode children. ' +
         'Instead, add a ref directly to the element you want to reference. ' +
         'Learn more about using refs safely here: ' +
@@ -141,7 +143,7 @@ describe('findDOMNode', () => {
     expect(match).toBe(child);
   });
 
-  // @gate www && !disableLegacyMode
+  // @gate www && classic && !disableLegacyMode
   it('findDOMNode should warn if passed a component that is inside StrictMode', () => {
     let parent = undefined;
     let child = undefined;
@@ -161,9 +163,9 @@ describe('findDOMNode', () => {
       container,
     );
 
-    let match;
-    expect(() => (match = ReactDOM.findDOMNode(parent))).toErrorDev([
-      'Warning: findDOMNode is deprecated in StrictMode. ' +
+    const match = ReactDOM.findDOMNode(parent);
+    assertConsoleErrorDev([
+      'findDOMNode is deprecated in StrictMode. ' +
         'findDOMNode was passed an instance of IsInStrictMode which is inside StrictMode. ' +
         'Instead, add a ref directly to the element you want to reference. ' +
         'Learn more about using refs safely here: ' +
