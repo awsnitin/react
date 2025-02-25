@@ -43,7 +43,11 @@ export opaque type FormInstance = mixed;
 export type ViewTransitionInstance = null | {name: string, ...};
 export opaque type InstanceMeasurement = mixed;
 export type EventResponder = any;
-export type GestureTimeline = any;
+export type FragmentInstance = null | {
+  appendChild: (child: Instance) => void,
+  parentInstance: Instance,
+  ...
+};
 
 export const rendererVersion = $$$config.rendererVersion;
 export const rendererPackageName = $$$config.rendererPackageName;
@@ -151,6 +155,11 @@ export const subscribeToGestureDirection =
 export const createViewTransitionInstance =
   $$$config.createViewTransitionInstance;
 export const clearContainer = $$$config.clearContainer;
+export const createFragmentInstance = $$$config.createFragmentInstance;
+export const appendChildToFragmentInstance =
+  $$$config.appendChildToFragmentInstance;
+export const removeChildFromFragmentInstance =
+  $$$config.removeChildFromFragmentInstance;
 
 // -------------------
 //     Persistence

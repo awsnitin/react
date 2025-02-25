@@ -1478,60 +1478,169 @@ export function createViewTransitionInstance(
   };
 }
 
-export type GestureTimeline = AnimationTimeline; // TODO: More provider types.
+type EventListenerOptionsOrUseCapture =
+  | boolean
+  | {
+      capture?: boolean,
+      once?: boolean,
+      passive?: boolean,
+      signal?: AbortSignal,
+      ...
+    };
 
-export function getCurrentGestureOffset(provider: GestureTimeline): number {
-  const time = provider.currentTime;
-  if (time === null) {
+type StoredEventListener = {
+  type: string,
+  listener: EventListener,
+  optionsOrUseCapture: void | EventListenerOptionsOrUseCapture,
+};
+
+export type FragmentInstance = {
+  _children: Set<Element>,
+  _eventListeners: Array<StoredEventListener>,
+  parentInstance: Instance | Container,
+  appendChild(child: Element): void,
+  removeChild(child: Element): void,
+  addEventListener(
+    type: string,
+    listener: EventListener,
+    optionsOrUseCapture?: EventListenerOptionsOrUseCapture,
+  ): void,
+  removeEventListener(
+    type: string,
+    listener: EventListener,
+    optionsOrUseCapture?: EventListenerOptionsOrUseCapture,
+  ): void,
+};
+
+function FragmentInstancePseudoElement(
+  this: FragmentInstance,
+  parentInstance: Container,
+) {
+  this.parentInstance = parentInstance || document.documentElement;
+  if (this.parentInstance === null) {
     throw new Error(
-      'Cannot start a gesture with a disconnected AnimationTimeline.',
+      'React expected a Fragment Ref to have a parent HTMLElement or to fallback to an <html> element ' +
+        '(document.documentElement). But no parent or <html> element was found. React never removes the ' +
+        'documentElement for any Document it renders into so the cause is likely in some other script ' +
+        'running on this page.',
     );
   }
-  return typeof time === 'number' ? time : time.value;
+  this._children = new Set();
+  this._eventListeners = [];
+}
+// $FlowFixMe[prop-missing]
+FragmentInstancePseudoElement.prototype.appendChild = function (
+  this: FragmentInstance,
+  child: Element,
+): void {
+  this._children.add(child);
+  for (let i = 0; i < this._eventListeners.length; i++) {
+    const {type, listener, optionsOrUseCapture} = this._eventListeners[i];
+    child.addEventListener(type, listener, optionsOrUseCapture);
+  }
+};
+// $FlowFixMe[prop-missing]
+FragmentInstancePseudoElement.prototype.removeChild = function (
+  this: FragmentInstance,
+  child: Element,
+): void {
+  this._children.delete(child);
+  for (let i = 0; i < this._eventListeners.length; i++) {
+    const {type, listener, optionsOrUseCapture} = this._eventListeners[i];
+    child.removeEventListener(type, listener, optionsOrUseCapture);
+  }
+};
+// $FlowFixMe[prop-missing]
+FragmentInstancePseudoElement.prototype.addEventListener = function (
+  this: FragmentInstance,
+  type: string,
+  listener: EventListener,
+  optionsOrUseCapture?: EventListenerOptionsOrUseCapture,
+): void {
+  // Element.addEventListener will only apply uniquely new event listeners by default. Since we
+  // need to collect the listeners to apply to appended children, we track them ourselves and use
+  // custom equality check for the options.
+  const isNewEventListener =
+    indexOfEventListener(this._eventListeners, {
+      type,
+      listener,
+      optionsOrUseCapture,
+    }) === -1;
+  if (isNewEventListener) {
+    this._eventListeners.push({type, listener, optionsOrUseCapture});
+    this._children.forEach(child => {
+      child.addEventListener(type, listener, optionsOrUseCapture);
+    });
+  }
+};
+// $FlowFixMe[prop-missing]
+FragmentInstancePseudoElement.prototype.removeEventListener = function (
+  this: FragmentInstance,
+  type: string,
+  listener: EventListener,
+  optionsOrUseCapture?: EventListenerOptionsOrUseCapture,
+): void {
+  this._children.forEach(child => {
+    child.removeEventListener(type, listener, optionsOrUseCapture);
+  });
+  const index = indexOfEventListener(this._eventListeners, {
+    type,
+    listener,
+    optionsOrUseCapture,
+  });
+  this._eventListeners.splice(index, 1);
+};
+
+function normalizeListenerOptions(
+  opts: ?EventListenerOptionsOrUseCapture,
+): string {
+  if (opts == null) {
+    return '0';
+  }
+
+  if (typeof opts === 'boolean') {
+    return `c=${opts ? '1' : '0'}`;
+  }
+
+  return `c=${opts.capture ? '1' : '0'}&o=${opts.once ? '1' : '0'}&p=${opts.passive ? '1' : '0'}`;
 }
 
-export function subscribeToGestureDirection(
-  provider: GestureTimeline,
-  currentOffset: number,
-  directionCallback: (direction: boolean) => void,
-): () => void {
-  if (
-    typeof ScrollTimeline === 'function' &&
-    provider instanceof ScrollTimeline
-  ) {
-    // For ScrollTimeline we optimize to only update the current time on scroll events.
-    const element = provider.source;
-    const scrollCallback = () => {
-      const newTime = provider.currentTime;
-      if (newTime !== null) {
-        const newValue = typeof newTime === 'number' ? newTime : newTime.value;
-        if (newValue !== currentOffset) {
-          directionCallback(newValue > currentOffset);
-        }
-      }
-    };
-    element.addEventListener('scroll', scrollCallback, false);
-    return () => {
-      element.removeEventListener('scroll', scrollCallback, false);
-    };
-  } else {
-    // For other AnimationTimelines, such as DocumentTimeline, we just update every rAF.
-    // TODO: Optimize ViewTimeline using an IntersectionObserver if it becomes common.
-    const rafCallback = () => {
-      const newTime = provider.currentTime;
-      if (newTime !== null) {
-        const newValue = typeof newTime === 'number' ? newTime : newTime.value;
-        if (newValue !== currentOffset) {
-          directionCallback(newValue > currentOffset);
-        }
-      }
-      callbackID = requestAnimationFrame(rafCallback);
-    };
-    let callbackID = requestAnimationFrame(rafCallback);
-    return () => {
-      cancelAnimationFrame(callbackID);
-    };
+function indexOfEventListener(
+  eventListeners: Array<StoredEventListener>,
+  eventListenerToFind: StoredEventListener,
+): number {
+  for (let i = 0; i < eventListeners.length; i++) {
+    const item = eventListeners[i];
+    if (
+      item.type === eventListenerToFind.type &&
+      item.listener === eventListenerToFind.listener &&
+      normalizeListenerOptions(item.optionsOrUseCapture) ===
+        normalizeListenerOptions(eventListenerToFind.optionsOrUseCapture)
+    ) {
+      return i;
+    }
   }
+  return -1;
+}
+
+export function createFragmentInstance(
+  parentInstance: Instance | Container,
+): FragmentInstance {
+  return new (FragmentInstancePseudoElement: any)(parentInstance);
+}
+
+export function appendChildToFragmentInstance(
+  childElement: Element,
+  fragmentInstance: FragmentInstance,
+): void {
+  fragmentInstance.appendChild(childElement);
+}
+
+export function removeChildFromFragmentInstance(
+  childElement: Element,
+  fragmentInstance: FragmentInstance,
+): void {
+  fragmentInstance.removeChild(childElement);
 }
 
 export function clearContainer(container: Container): void {
